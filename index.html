@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Keuangan PMI Kecamatan Sumowono</title>
+    <title>Sistem Keuangan PMI Kecamatan Sumowono (Cloud Firestore)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -13,9 +13,10 @@
     <!-- Google Font Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDK (v9 Compatibility Mode) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <!-- Firebase SDK Compat via CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
 
     <script>
         tailwind.config = {
@@ -67,7 +68,6 @@
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        /* Ensure touch target sizes on mobile */
         button, select, input, textarea {
             touch-action: manipulation;
         }
@@ -87,7 +87,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-sm leading-tight">PMI SUMOWONO</h1>
-                    <p class="text-[10px] text-pmi-200">Keuangan Kecamatan</p>
+                    <p class="text-[10px] text-pmi-200">Firebase Firestore Cloud</p>
                 </div>
             </div>
         </div>
@@ -97,7 +97,7 @@
         </button>
     </header>
 
-    <!-- Mobile Drawer Overlay / Backdrop -->
+    <!-- Mobile Drawer Overlay -->
     <div id="mobileMenuBackdrop" onclick="closeMobileMenu()" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 hidden md:hidden transition-opacity"></div>
 
     <!-- Sidebar Navigation -->
@@ -111,7 +111,7 @@
                     </div>
                     <div>
                         <h1 class="font-bold text-base leading-tight">PMI SUMOWONO</h1>
-                        <p class="text-xs text-pmi-200">Keuangan Kecamatan</p>
+                        <p class="text-xs text-pmi-200">Keuangan Cloud System</p>
                     </div>
                 </div>
                 <button onclick="closeMobileMenu()" class="md:hidden text-pmi-200 hover:text-white p-1">
@@ -143,21 +143,26 @@
                 </button>
                 <button onclick="switchTab('pengaturan')" id="nav-pengaturan" class="nav-btn w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-pmi-100 hover:bg-pmi-800 transition">
                     <i class="fa-solid fa-sliders w-5 text-center"></i>
-                    <span>Pengaturan / Master</span>
+                    <span>Pengaturan / Firebase</span>
                 </button>
             </nav>
         </div>
 
-        <!-- User Info Footer -->
-        <div class="p-4 bg-pmi-950 border-t border-pmi-800 text-xs text-pmi-200">
+        <!-- User & Cloud Status Footer -->
+        <div class="p-4 bg-pmi-950 border-t border-pmi-800 text-xs text-pmi-200 space-y-2">
             <div class="flex items-center justify-between">
                 <div>
                     <p class="font-semibold text-white" id="sidebarBendahara">Bendahara PMI</p>
                     <p class="text-pmi-300">Kecamatan Sumowono</p>
                 </div>
-                <div class="bg-pmi-700 p-1.5 rounded text-white" title="Firebase Online System">
-                    <i class="fa-solid fa-cloud text-emerald-400"></i>
+                <div class="bg-pmi-700 p-1.5 rounded text-white" title="Firebase Realtime Active">
+                    <i class="fa-solid fa-cloud text-xs"></i>
                 </div>
+            </div>
+            <!-- Cloud Status Badge -->
+            <div id="sidebarCloudBadge" class="p-2 rounded-lg bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-[11px] flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="sidebarCloudText" class="truncate font-medium">Terhubung Ke Firebase</span>
             </div>
         </div>
     </aside>
@@ -168,9 +173,9 @@
         <header class="bg-white border-b border-slate-200 p-4 px-6 hidden md:flex items-center justify-between no-print sticky top-0 z-10 shadow-sm">
             <div class="flex items-center space-x-3">
                 <span id="pageTitle" class="font-bold text-xl text-slate-800">Dashboard Keuangan</span>
-                <span class="bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-200 flex items-center space-x-1">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>Firebase Live</span>
+                <span id="topCloudStatusBadge" class="bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-200 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-cloud text-xs"></i>
+                    <span id="topCloudStatusText">Firebase Firestore Active</span>
                 </span>
             </div>
             <div class="flex items-center space-x-2">
@@ -178,13 +183,17 @@
                     <i class="fa-solid fa-plus"></i>
                     <span>Tambah Transaksi</span>
                 </button>
+                <button onclick="syncLocalToFirebase()" id="btnSyncCloud" title="Sinkronkan Data Lokal ke Cloud Firestore" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs px-3 py-2 rounded-lg transition border border-blue-200 flex items-center space-x-1">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span class="hidden sm:inline">Sync Cloud</span>
+                </button>
                 <button onclick="loadSampleData()" title="Muat Data Contoh" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs px-3 py-2 rounded-lg transition border border-slate-300">
                     <i class="fa-solid fa-database"></i> <span class="hidden sm:inline">Data Demo</span>
                 </button>
             </div>
         </header>
 
-        <!-- Notification Toast Container -->
+        <!-- Notification Toast -->
         <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-xl text-sm flex items-center space-x-3 pointer-events-none max-w-xs sm:max-w-md">
             <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
             <span id="toastMessage">Pesan notifikasi</span>
@@ -268,10 +277,10 @@
                     </div>
                 </div>
 
-                <!-- Transaksi Terakhir Table -->
+                <!-- Recent Transactions Table -->
                 <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                     <div class="p-5 border-b border-slate-100 flex items-center justify-between">
-                        <h3 class="font-bold text-slate-800 text-sm">5 Transaksi Terakhir</h3>
+                        <h3 class="font-bold text-slate-800 text-sm">5 Transaksi Terakhir (Real-time Cloud)</h3>
                         <button onclick="switchTab('bku')" class="text-xs font-semibold text-pmi-600 hover:text-pmi-800 transition">Lihat Semua di BKU &rarr;</button>
                     </div>
                     <div class="overflow-x-auto">
@@ -286,7 +295,6 @@
                                 </tr>
                             </thead>
                             <tbody id="recentTransactionsTable" class="divide-y divide-slate-100">
-                                <!-- Dynamic Content -->
                             </tbody>
                         </table>
                     </div>
@@ -321,7 +329,6 @@
                                 </tr>
                             </thead>
                             <tbody id="penerimaanTable" class="divide-y divide-slate-100">
-                                <!-- Dynamic Content -->
                             </tbody>
                         </table>
                     </div>
@@ -356,7 +363,6 @@
                                 </tr>
                             </thead>
                             <tbody id="pengeluaranTable" class="divide-y divide-slate-100">
-                                <!-- Dynamic Content -->
                             </tbody>
                         </table>
                     </div>
@@ -378,6 +384,7 @@
                             </button>
                         </div>
                     </div>
+                    
                     <div class="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                         <div>
                             <label class="block text-slate-500 font-semibold mb-1">Filter Bulan & Tahun</label>
@@ -412,7 +419,6 @@
                                 </tr>
                             </thead>
                             <tbody id="bkuTableBody" class="divide-y divide-slate-100 font-mono text-xs">
-                                <!-- Dynamic Content -->
                             </tbody>
                             <tfoot class="bg-slate-50 font-bold text-slate-800 text-xs border-t border-slate-300">
                                 <tr>
@@ -462,6 +468,8 @@
 
                 <!-- Printable Report Sheet -->
                 <div class="bg-white p-8 rounded-xl border border-slate-300 shadow-md print-container max-w-4xl mx-auto text-slate-900 leading-normal">
+                    
+                    <!-- KOP SURAT PMI -->
                     <div class="border-b-4 border-double border-slate-900 pb-4 mb-6 flex items-center justify-between">
                         <div class="w-16 h-16 bg-pmi-600 rounded-full flex items-center justify-center text-white text-3xl font-extrabold flex-shrink-0 shadow-sm">
                             <span>✚</span>
@@ -481,224 +489,182 @@
                         <p class="text-xs text-slate-600 font-medium mt-1" id="printDocSubtitle">Periode: Semua Transaksi</p>
                     </div>
 
-                    <div id="printTableContainer" class="mb-8">
-                        <!-- Rendered Dynamic Content -->
-                    </div>
+                    <div id="printTableContainer" class="mb-8"></div>
 
                     <div class="grid grid-cols-2 gap-4 mb-10 text-xs border border-slate-300 p-3 rounded bg-slate-50/50">
                         <div>
                             <p class="font-bold text-slate-700 mb-1 uppercase">Rincian Posisi Kas Akhir:</p>
-                            <div class="space-y-0.5">
-                                <div class="flex justify-between">
-                                    <span>1. Kas Tunai Sekretariat:</span>
-                                    <span class="font-semibold" id="printKasTunai">Rp 0</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>2. Rekening Bank PMI:</span>
-                                    <span class="font-semibold" id="printKasBank">Rp 0</span>
-                                </div>
-                                <div class="flex justify-between font-bold border-t border-slate-300 pt-1 mt-1 text-slate-800">
-                                    <span>Total Saldo Kas:</span>
-                                    <span id="printTotalKas">Rp 0</span>
-                                </div>
-                            </div>
+                            <p class="flex justify-between"><span>1. Kas Tunai (Sekretariat):</span> <span class="font-bold" id="printKasTunai">Rp 0</span></p>
+                            <p class="flex justify-between"><span>2. Kas Rekening Bank PMI:</span> <span class="font-bold" id="printKasBank">Rp 0</span></p>
                         </div>
-                        <div class="flex flex-col justify-end text-right text-[11px] text-slate-500 italic">
-                            <p>Dokumen ini dicetak melalui Sistem Informasi Keuangan Resmi PMI Kecamatan Sumowono.</p>
-                            <p id="printGeneratedDate">Tanggal Cetak: -</p>
+                        <div class="border-l border-slate-300 pl-4 flex flex-col justify-center">
+                            <p class="text-slate-500">Total Saldo Tersedia:</p>
+                            <p class="text-base font-extrabold text-slate-900" id="printTotalKas">Rp 0</p>
                         </div>
                     </div>
 
-                    <!-- Identitas Penandatangan Laporan (Tanda Tangan) -->
-                    <div class="grid grid-cols-2 gap-8 text-center text-xs pt-4 page-break-inside-avoid">
-                        <div>
-                            <p class="text-slate-600 mb-1">Mengetahui,</p>
-                            <p class="font-bold text-slate-800 uppercase" id="printTitleKetua">Ketua PMI Kecamatan Sumowono</p>
-                            <div class="h-20"></div>
-                            <p class="font-bold underline text-slate-900 text-sm" id="printNameKetua">-</p>
-                            <p class="text-slate-500" id="printNipKetua">NIP / NBM. -</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 mb-1" id="printSignCityDate">Sumowono, -</p>
-                            <p class="font-bold text-slate-800 uppercase" id="printTitleBendahara">Bendahara PMI Kecamatan Sumowono</p>
-                            <div class="h-20"></div>
-                            <p class="font-bold underline text-slate-900 text-sm" id="printNameBendahara">-</p>
-                            <p class="text-slate-500" id="printNipBendahara">NIP / NBM. -</p>
+                    <div class="mt-12 pt-4 border-t border-slate-200">
+                        <div class="flex justify-between items-start text-xs leading-relaxed">
+                            <div class="text-center w-64">
+                                <p class="font-semibold">Mengetahui / Menyetujui,</p>
+                                <p class="font-bold uppercase text-slate-800">Ketua PMI Kecamatan Sumowono</p>
+                                <p class="text-[11px] text-slate-500 italic mb-16">(Sekretaris Camat Sumowono)</p>
+                                <p class="font-bold underline uppercase text-slate-900" id="printSekcamName">-[ NAMA SEKCAM ]-</p>
+                                <p class="text-slate-600" id="printSekcamNip">NIP. -</p>
+                            </div>
+
+                            <div class="text-center w-64">
+                                <p id="printDateLoc">Sumowono, [Tanggal]</p>
+                                <p class="font-bold uppercase text-slate-800">Bendahara PMI Kecamatan Sumowono</p>
+                                <p class="text-[11px] text-slate-500 italic mb-16">&nbsp;</p>
+                                <p class="font-bold underline uppercase text-slate-900" id="printBendaharaName">-[ NAMA BENDAHARA ]-</p>
+                                <p class="text-slate-600">Pengelola Keuangan</p>
+                            </div>
                         </div>
                     </div>
+
                 </div>
             </section>
 
-            <!-- 6. PENGATURAN / MASTER TAB -->
+            <!-- 6. PENGATURAN / FIREBASE MASTER TAB -->
             <section id="tab-pengaturan" class="tab-content hidden space-y-6">
-                <!-- Modul 1: Saldo Awal Kas & Bank -->
+                
+                <!-- FIREBASE CONFIGURATION BOX -->
                 <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
-                        <i class="fa-solid fa-coins text-pmi-600 text-lg"></i>
+                    <div class="flex items-center justify-between border-b pb-3">
                         <div>
-                            <h3 class="font-bold text-slate-800 text-sm">Update Saldo Awal Keuangan</h3>
-                            <p class="text-xs text-slate-500">Tentukan nilai saldo awal Kas Tunai dan Bank saat sistem mulai digunakan (Disimpan di Firebase)</p>
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                                <i class="fa-solid fa-cloud text-pmi-600"></i>
+                                <span>Konfigurasi Firebase Firestore Cloud Database</span>
+                            </h3>
+                            <p class="text-xs text-slate-500">Hubungkan aplikasi dengan database cloud Firebase untuk sinkronisasi otomatis antar peragkat HP/Laptop.</p>
+                        </div>
+                        <span id="cfgStatusBadge" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                            Terhubung (Firestore)
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">API Key</label>
+                            <input type="text" id="fbApiKey" placeholder="AIzaSy..." class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Auth Domain</label>
+                            <input type="text" id="fbAuthDomain" placeholder="pmi-sumowono.firebaseapp.com" class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Project ID</label>
+                            <input type="text" id="fbProjectId" placeholder="pmi-sumowono" class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Storage Bucket</label>
+                            <input type="text" id="fbStorageBucket" placeholder="pmi-sumowono.appspot.com" class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">Messaging Sender ID</label>
+                            <input type="text" id="fbSenderId" placeholder="123456789" class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-600 mb-1">App ID</label>
+                            <input type="text" id="fbAppId" placeholder="1:123456:web:abcd" class="w-full border border-slate-300 rounded-lg p-2 font-mono focus:ring-2 focus:ring-pmi-500 outline-none">
                         </div>
                     </div>
-                    <form onsubmit="handleSaveSaldoAwal(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+
+                    <div class="flex items-center justify-between pt-2">
+                        <button onclick="saveFirebaseConfig()" class="bg-pmi-600 hover:bg-pmi-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition shadow">
+                            <i class="fa-solid fa-plug mr-1"></i> Simpan & Hubungkan Firebase
+                        </button>
+                        <button onclick="syncLocalToFirebase()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-4 py-2 rounded-lg transition shadow">
+                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Upload Semua Data Lokal ke Cloud
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Form Identitas Pejabat -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold text-slate-800 text-sm border-b pb-2">Identitas Penandatangan Laporan</h3>
+                        
                         <div>
-                            <label class="block text-slate-700 font-semibold mb-1">Saldo Awal Kas Tunai (Rp)</label>
-                            <input type="number" id="masterSaldoKas" required min="0" placeholder="0" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Ketua PMI / Sekcam Sumowono</label>
+                            <input type="text" id="cfgSekcamName" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
                         </div>
+
                         <div>
-                            <label class="block text-slate-700 font-semibold mb-1">Saldo Awal Bank (Rp)</label>
-                            <input type="number" id="masterSaldoBank" required min="0" placeholder="0" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">NIP Sekcam Sumowono</label>
+                            <input type="text" id="cfgSekcamNip" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
                         </div>
-                        <div class="md:col-span-2 flex justify-end">
-                            <button type="submit" class="bg-pmi-600 hover:bg-pmi-700 text-white font-medium px-4 py-2 rounded-lg transition shadow flex items-center space-x-1.5">
-                                <i class="fa-solid fa-floppy-disk"></i>
-                                <span>Simpan Saldo Awal</span>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Nama Bendahara PMI Kecamatan</label>
+                            <input type="text" id="cfgBendaharaName" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
+                        </div>
+
+                        <button onclick="saveSettings()" class="bg-pmi-600 hover:bg-pmi-700 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition shadow">
+                            Simpan Identitas
+                        </button>
+                    </div>
+
+                    <!-- Saldo Awal & Backup -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <h3 class="font-bold text-slate-800 text-sm border-b pb-2">Manajemen & Backup Data</h3>
+                            
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Saldo Awal Kas Tunai (Rp)</label>
+                                <input type="number" id="cfgSaldoAwalKas" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Saldo Awal Bank (Rp)</label>
+                                <input type="number" id="cfgSaldoAwalBank" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
+                            </div>
+
+                            <button onclick="saveSaldoAwal()" class="bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs px-4 py-2 rounded-lg transition">
+                                Update Saldo Awal
                             </button>
                         </div>
-                    </form>
-                </div>
 
-                <!-- Modul 2: Identitas Penandatangan Laporan -->
-                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
-                        <i class="fa-solid fa-signature text-pmi-600 text-lg"></i>
-                        <div>
-                            <h3 class="font-bold text-slate-800 text-sm">Identitas Penandatangan Laporan</h3>
-                            <p class="text-xs text-slate-500">Pengaturan nama dan jabatan yang tercantum pada berkas cetak LPJ</p>
-                        </div>
-                    </div>
-                    <form onsubmit="handleSaveSigners(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                        <!-- Ketua -->
-                        <div class="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <h4 class="font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">Pejabat Ketua PMI</h4>
-                            <div>
-                                <label class="block text-slate-600 mb-1">Nama Ketua</label>
-                                <input type="text" id="signerKetuaNama" placeholder="Nama Lengkap & Gelar" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
+                        <div class="pt-4 border-t border-slate-100 space-y-2">
+                            <p class="text-xs text-slate-500 font-semibold">Cadangan Data (Backup/Restore)</p>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="exportDataJSON()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-2 rounded-lg transition border border-slate-300">
+                                    <i class="fa-solid fa-download mr-1"></i> Backup (JSON)
+                                </button>
+                                <label class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-2 rounded-lg transition border border-slate-300 text-center cursor-pointer">
+                                    <i class="fa-solid fa-upload mr-1"></i> Restore
+                                    <input type="file" id="importJsonInput" onchange="importDataJSON(event)" class="hidden" accept=".json">
+                                </label>
                             </div>
-                            <div>
-                                <label class="block text-slate-600 mb-1">NIP / Nomor Anggota</label>
-                                <input type="text" id="signerKetuaNip" placeholder="NIP / ID Anggota" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 mb-1">Jabatan Pada Laporan</label>
-                                <input type="text" id="signerKetuaJabatan" value="Ketua PMI Kecamatan Sumowono" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
-                            </div>
-                        </div>
-
-                        <!-- Bendahara -->
-                        <div class="space-y-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <h4 class="font-bold text-slate-700 uppercase border-b border-slate-200 pb-1">Pejabat Bendahara PMI</h4>
-                            <div>
-                                <label class="block text-slate-600 mb-1">Nama Bendahara</label>
-                                <input type="text" id="signerBendaharaNama" placeholder="Nama Lengkap & Gelar" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 mb-1">NIP / Nomor Anggota</label>
-                                <input type="text" id="signerBendaharaNip" placeholder="NIP / ID Anggota" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
-                            </div>
-                            <div>
-                                <label class="block text-slate-600 mb-1">Jabatan Pada Laporan</label>
-                                <input type="text" id="signerBendaharaJabatan" value="Bendahara PMI Kecamatan Sumowono" class="w-full border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-pmi-500">
-                            </div>
-                        </div>
-
-                        <div class="md:col-span-2 flex justify-end">
-                            <button type="submit" class="bg-pmi-600 hover:bg-pmi-700 text-white font-medium px-4 py-2 rounded-lg transition shadow flex items-center space-x-1.5">
-                                <i class="fa-solid fa-floppy-disk"></i>
-                                <span>Simpan Identitas Penandatangan</span>
+                            <button onclick="confirmClearAllData()" class="w-full text-rose-600 hover:text-rose-800 text-xs font-semibold py-1 transition text-center">
+                                Reset Semua Data Transaksi
                             </button>
                         </div>
-                    </form>
-                </div>
-
-                <!-- Modul 3: Kelola Kategori Transaksi -->
-                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
-                        <i class="fa-solid fa-tags text-pmi-600 text-lg"></i>
-                        <div>
-                            <h3 class="font-bold text-slate-800 text-sm">Kelola Kategori Transaksi</h3>
-                            <p class="text-xs text-slate-500">Tambah atau hapus daftar kategori penerimaan dan pengeluaran kas</p>
-                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                        <!-- Kategori Penerimaan -->
-                        <div class="space-y-3">
-                            <h4 class="font-bold text-emerald-700 flex items-center justify-between">
-                                <span>Kategori Penerimaan</span>
-                                <span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full" id="countCatPenerimaan">0</span>
-                            </h4>
-                            <form onsubmit="handleAddCategory(event, 'penerimaan')" class="flex space-x-2">
-                                <input type="text" id="newCatPenerimaan" required placeholder="Nama Kategori Baru..." class="flex-1 border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-emerald-500">
-                                <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-3 py-2 rounded-lg transition">Tambah</button>
-                            </form>
-                            <ul id="listCatPenerimaan" class="divide-y divide-slate-100 border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
-                                <!-- Dynamic JS -->
-                            </ul>
+                    <!-- Kelola Kategori -->
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold text-slate-800 text-sm border-b pb-2 flex items-center justify-between">
+                            <span><i class="fa-solid fa-list-check text-pmi-600 mr-1.5"></i>Kelola Kategori Transaksi</span>
+                            <span class="text-[10px] bg-pmi-50 text-pmi-700 font-semibold px-2 py-0.5 rounded">Master Data</span>
+                        </h3>
+                        
+                        <div class="flex border-b border-slate-200">
+                            <button type="button" onclick="switchCategoryTab('penerimaan')" id="catTabPenerimaan" class="px-3 py-1.5 text-xs font-semibold border-b-2 border-pmi-600 text-pmi-600 transition">Penerimaan</button>
+                            <button type="button" onclick="switchCategoryTab('pengeluaran')" id="catTabPengeluaran" class="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition">Pengeluaran</button>
                         </div>
 
-                        <!-- Kategori Pengeluaran -->
-                        <div class="space-y-3">
-                            <h4 class="font-bold text-rose-700 flex items-center justify-between">
-                                <span>Kategori Pengeluaran</span>
-                                <span class="bg-rose-100 text-rose-800 text-[10px] px-2 py-0.5 rounded-full" id="countCatPengeluaran">0</span>
-                            </h4>
-                            <form onsubmit="handleAddCategory(event, 'pengeluaran')" class="flex space-x-2">
-                                <input type="text" id="newCatPengeluaran" required placeholder="Nama Kategori Baru..." class="flex-1 border border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-rose-500">
-                                <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-medium px-3 py-2 rounded-lg transition">Tambah</button>
-                            </form>
-                            <ul id="listCatPengeluaran" class="divide-y divide-slate-100 border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
-                                <!-- Dynamic JS -->
-                            </ul>
-                        </div>
-                    </div>
-                </div>
+                        <div id="categoryListContainer" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
 
-                <!-- Modul 4: Manajemen & Backup Data -->
-                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                    <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
-                        <i class="fa-solid fa-database text-pmi-600 text-lg"></i>
-                        <div>
-                            <h3 class="font-bold text-slate-800 text-sm">Manajemen & Backup Data Firebase</h3>
-                            <p class="text-xs text-slate-500">Ekspor cadangan database JSON, restore data dari berkas cadangan, atau kosongkan database</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
-                            <div>
-                                <h4 class="font-bold text-slate-800 flex items-center space-x-1">
-                                    <i class="fa-solid fa-download text-blue-600"></i>
-                                    <span>Backup Data JSON</span>
-                                </h4>
-                                <p class="text-slate-500 text-[11px] mt-1">Unduh seluruh berkas konfigurasi, kategori, dan transaksi keuangan dalam bentuk berkas JSON.</p>
+                        <div class="pt-3 border-t border-slate-100">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Tambah Kategori Baru</label>
+                            <div class="flex space-x-2">
+                                <input type="text" id="newCategoryInput" class="flex-1 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-pmi-500 outline-none" placeholder="Nama kategori baru...">
+                                <button onclick="addNewCategory()" class="bg-pmi-600 hover:bg-pmi-700 text-white font-semibold text-xs px-3 py-2 rounded-lg transition shadow">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
                             </div>
-                            <button onclick="exportDatabaseJSON()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition mt-3">Download Backup</button>
-                        </div>
-
-                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 flex flex-col justify-between">
-                            <div>
-                                <h4 class="font-bold text-slate-800 flex items-center space-x-1">
-                                    <i class="fa-solid fa-upload text-emerald-600"></i>
-                                    <span>Restore Data JSON</span>
-                                </h4>
-                                <p class="text-slate-500 text-[11px] mt-1">Pulihkan seluruh database keuangan menggunakan berkas cadangan JSON yang valid.</p>
-                            </div>
-                            <div>
-                                <input type="file" id="importJsonFile" accept=".json" class="hidden" onchange="importDatabaseJSON(event)">
-                                <button onclick="document.getElementById('importJsonFile').click()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition mt-3">Restore Dari File</button>
-                            </div>
-                        </div>
-
-                        <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl space-y-2 flex flex-col justify-between">
-                            <div>
-                                <h4 class="font-bold text-rose-800 flex items-center space-x-1">
-                                    <i class="fa-solid fa-trash-triangle text-rose-600"></i>
-                                    <span>Reset Database</span>
-                                </h4>
-                                <p class="text-rose-600 text-[11px] mt-1">Hapus seluruh transaksi dan kembalikan pengaturan ke awal. Tindakan ini tidak dapat dibatalkan!</p>
-                            </div>
-                            <button onclick="resetFirebaseDatabase()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-medium py-2 rounded-lg transition mt-3">Reset Semua Data</button>
                         </div>
                     </div>
                 </div>
@@ -707,72 +673,124 @@
         </div>
     </main>
 
-    <!-- MODAL FORM TRANSAKSI (INPUT / EDIT) -->
-    <div id="modalTransaction" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden transform transition-all">
-            <div class="bg-pmi-900 text-white p-4 px-6 flex items-center justify-between">
-                <h3 class="font-bold text-base flex items-center space-x-2" id="modalTxTitle">
+    <!-- MODAL EDIT KATEGORI -->
+    <div id="modalEditCategory" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-100">
+            <div class="bg-pmi-900 text-white p-3.5 px-5 flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
                     <i class="fa-solid fa-pen-to-square text-pmi-400"></i>
-                    <span>Catat Transaksi Keuangan</span>
+                    <span>Edit Kategori Transaksi</span>
                 </h3>
-                <button onclick="closeModalTransaction()" class="text-pmi-200 hover:text-white transition">
-                    <i class="fa-solid fa-xmark text-xl"></i>
-                </button>
+                <button onclick="closeModalEditCategory()" class="text-pmi-200 hover:text-white transition text-base">&times;</button>
+            </div>
+            <div class="p-5 space-y-3 text-xs">
+                <input type="hidden" id="editCatOldName">
+                <input type="hidden" id="editCatType">
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Nama Kategori Baru</label>
+                    <input type="text" id="editCatInput" class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-pmi-500 outline-none">
+                </div>
+                <div class="pt-3 flex items-center justify-end space-x-2">
+                    <button type="button" onclick="closeModalEditCategory()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Batal</button>
+                    <button type="button" onclick="saveEditedCategory()" class="px-4 py-2 rounded-lg bg-pmi-600 hover:bg-pmi-700 text-white font-semibold transition shadow">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL KONFIRMASI -->
+    <div id="modalConfirm" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden border border-slate-100 p-5 space-y-4">
+            <div class="flex items-start space-x-3 text-amber-500">
+                <div class="p-2.5 bg-amber-50 rounded-xl flex-shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm text-slate-800" id="confirmTitle">Konfirmasi Action</h3>
+                    <p id="confirmMessage" class="text-xs text-slate-600 mt-1">Apakah Anda yakin ingin melakukan tindakan ini?</p>
+                </div>
+            </div>
+            <div class="pt-2 flex items-center justify-end space-x-2 text-xs">
+                <button type="button" onclick="closeConfirmModal()" class="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Batal</button>
+                <button type="button" id="confirmOkBtn" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold transition shadow">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL INPUT TRANSAKSI -->
+    <div id="modalTransaction" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden no-print">
+        <div class="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+            <div class="bg-pmi-900 text-white p-4 px-5 flex items-center justify-between flex-shrink-0">
+                <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2" id="modalTxTitle">
+                    <i class="fa-solid fa-pen-to-square text-pmi-400"></i>
+                    <span>Form Transaksi Keuangan</span>
+                </h3>
+                <button onclick="closeModalTransaction()" class="text-pmi-200 hover:text-white transition text-xl">&times;</button>
             </div>
 
-            <form onsubmit="handleSaveTransaction(event)" class="p-6 space-y-4 text-xs">
+            <form id="txForm" onsubmit="handleSaveTransaction(event)" class="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto flex-1">
                 <input type="hidden" id="txId">
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-slate-700 font-semibold mb-1">Jenis Transaksi</label>
-                        <select id="txType" onchange="handleTypeChange()" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none font-semibold">
-                            <option value="penerimaan">Penerimaan (Kas Masuk)</option>
-                            <option value="pengeluaran">Pengeluaran (SPJ Outflow)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-slate-700 font-semibold mb-1">Tanggal Transaksi</label>
-                        <input type="date" id="txDate" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Jenis Transaksi</label>
+                    <div class="grid grid-cols-2 gap-2 sm:gap-3">
+                        <label class="flex items-center space-x-2 border p-2.5 rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-300">
+                            <input type="radio" name="txType" value="penerimaan" onchange="updateCategoryOptions()" checked class="text-pmi-600 focus:ring-pmi-500">
+                            <span class="font-medium text-emerald-700 text-xs"><i class="fa-solid fa-circle-arrow-down mr-1"></i> Masuk</span>
+                        </label>
+                        <label class="flex items-center space-x-2 border p-2.5 rounded-lg cursor-pointer hover:bg-slate-50 transition border-slate-300">
+                            <input type="radio" name="txType" value="pengeluaran" onchange="updateCategoryOptions()" class="text-pmi-600 focus:ring-pmi-500">
+                            <span class="font-medium text-rose-700 text-xs"><i class="fa-solid fa-circle-arrow-up mr-1"></i> SPJ / Keluar</span>
+                        </label>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-slate-700 font-semibold mb-1" id="labelTxParty">Sumber Dana / Donatur</label>
-                        <input type="text" id="txParty" required placeholder="Misal: Kantor Kecamatan / H. Ahmad" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
+                        <label class="block font-semibold text-slate-700 mb-1">Tanggal Transaksi *</label>
+                        <input type="date" id="txDate" required class="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-pmi-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-slate-700 font-semibold mb-1">Kategori Transaksi</label>
-                        <select id="txCategory" required class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
-                            <!-- Dynamic Options -->
-                        </select>
+                        <label class="block font-semibold text-slate-700 mb-1">Nominal (Rp) *</label>
+                        <input type="number" id="txAmount" min="1" required placeholder="0" class="w-full border border-slate-300 rounded-lg p-2.5 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-pmi-500 outline-none">
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-slate-700 font-semibold mb-1">Metode Pembayaran</label>
-                        <select id="txMethod" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none">
-                            <option value="kas">Kas Tunai</option>
+                        <label class="block font-semibold text-slate-700 mb-1" id="lblParty">Sumber Dana / Donatur *</label>
+                        <input type="text" id="txParty" required placeholder="Contoh: Bulan Dana Desa Candigaron / Struk Toko A" class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-pmi-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">Metode Pembayaran *</label>
+                        <select id="txMethod" required class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-pmi-500 outline-none">
+                            <option value="kas">Kas Tunai Sekretariat</option>
                             <option value="bank">Rekening Bank PMI</option>
                         </select>
-                    </div>
-                    <div>
-                        <label class="block text-slate-700 font-semibold mb-1">Nominal (Rp)</label>
-                        <input type="number" id="txAmount" required min="1" placeholder="0" class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none font-bold text-slate-900">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-slate-700 font-semibold mb-1">Uraian / Keterangan Transaksi</label>
-                    <textarea id="txDescription" rows="3" required placeholder="Jelaskan rincian kegiatan / nomor nota..." class="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-pmi-500 outline-none"></textarea>
+                    <label class="block font-semibold text-slate-700 mb-1">Kategori Transaksi *</label>
+                    <select id="txCategory" required class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-pmi-500 outline-none"></select>
                 </div>
 
-                <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-                    <button type="button" onclick="closeModalTransaction()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition">Batal</button>
-                    <button type="submit" class="px-5 py-2 bg-pmi-600 hover:bg-pmi-700 text-white font-medium rounded-lg transition shadow flex items-center space-x-1.5">
-                        <i class="fa-solid fa-floppy-disk"></i>
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Uraian / Keterangan Transaksi *</label>
+                    <textarea id="txDescription" rows="2" required placeholder="Penjelasan detail transaksi atau nomor nota SPJ..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-pmi-500 outline-none"></textarea>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Lampiran Foto Bukti / Struk SPJ (Cloud Storage)</label>
+                    <input type="file" id="txProof" accept="image/*" onchange="previewProofImage(event)" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-slate-50">
+                    <div id="proofPreviewContainer" class="mt-2 hidden">
+                        <img id="proofPreviewImg" class="h-20 rounded border border-slate-300 object-cover">
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-2 flex-shrink-0">
+                    <button type="button" onclick="closeModalTransaction()" class="px-4 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Batal</button>
+                    <button type="submit" id="btnSubmitTx" class="px-5 py-2.5 rounded-lg bg-pmi-600 hover:bg-pmi-700 text-white font-semibold transition shadow flex items-center space-x-1">
                         <span>Simpan Transaksi</span>
                     </button>
                 </div>
@@ -780,838 +798,1103 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT LOGIC WITH FIREBASE DIRECT INTEGRATION -->
+    <!-- Floating Action Button -->
+    <div class="fixed bottom-4 right-4 z-30 md:hidden no-print">
+        <button onclick="openModalTransaction()" class="w-14 h-14 bg-pmi-600 hover:bg-pmi-700 text-white rounded-full shadow-2xl flex items-center justify-center text-xl transition transform active:scale-95 border-2 border-white">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+    </div>
+
     <script>
-        // --- 1. CONFIGURATION & FIREBASE INITIALIZATION ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyA13xfs3ny9LymMdIuZzW7KEaQcBEiD8kk",
-            authDomain: "sistem-keuangan-pmi.firebaseapp.com",
-            databaseURL: "https://pmi-sumowono-keuangan-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "sistem-keuangan-pmi",
-            storageBucket: "sistem-keuangan-pmi.firebasestorage.app",
-            messagingSenderId: "701406719111",
-            appId: "1:701406719111:web:e5610e40b48e97dddb1c22"
+        const STORAGE_KEY = 'PMI_SUMOWONO_FINANCE_DATA_V1';
+        const FIREBASE_CFG_KEY = 'PMI_SUMOWONO_FIREBASE_CONFIG';
+
+        // Default Firebase credentials preset for PMI Sumowono
+        const DEFAULT_FIREBASE_CONFIG = {
+            apiKey: "AIzaSySumowonoPmiDemoKey2026XyZ",
+            authDomain: "pmi-sumowono-keuangan.firebaseapp.com",
+            projectId: "pmi-sumowono-keuangan",
+            storageBucket: "pmi-sumowono-keuangan.appspot.com",
+            messagingSenderId: "987654321012",
+            appId: "1:987654321012:web:abc123def456ghi"
         };
 
-        // Initialize Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.database();
-
-        // Application State
-        let appState = {
-            initialBalance: { kas: 0, bank: 0 },
-            signers: {
-                ketua: { nama: "Drs. H. Ahmad Fauzi", nip: "19680512 199403 1 004", jabatan: "Ketua PMI Kecamatan Sumowono" },
-                bendahara: { nama: "Siti Rahmawati, S.E.", nip: "19850320 201001 2 015", jabatan: "Bendahara PMI Kecamatan Sumowono" }
-            },
-            categories: {
-                penerimaan: ["Bulan Dana PMI", "Hibah Pemerintah", "Donasi Society / Masyarakat", "Bantuan Bencana", "Lain-lain"],
-                pengeluaran: ["Operasional Sekretariat", "Tanggap Darurat Bencana", "Kegiatan Donor Darah", "Pelatihan & KSR/PMR", "Perjalanan Dinas", "Lain-lain"]
-            },
-            transactions: []
+        const DEFAULT_CATEGORIES = {
+            penerimaan: [
+                'Bulan Dana PMI',
+                'Hibah Kecamatan / Pemkab',
+                'Donasi Murni / Masyarakat',
+                'Jasa Layanan Ambulans / Pertolongan Pertama',
+                'Penerimaan Lainnya'
+            ],
+            pengeluaran: [
+                'Operasional & ATK Sekretariat',
+                'Tanggap Darurat & Penanggulangan Bencana',
+                'Pelatihan KSR / TSR / PMR',
+                'Kegiatan Donor Darah Ranting',
+                'Bantuan Sosial & Kemanusiaan',
+                'Pemeliharaan Aset & Kendaraan'
+            ]
         };
 
+        let appData = {
+            transactions: [],
+            settings: {
+                sekcamName: 'Drs. H. Ahmad Fauzi, M.Si',
+                sekcamNip: '19780512 200501 1 008',
+                bendaharaName: 'Siti Rahmawati, A.Md',
+                saldoAwalKas: 1500000,
+                saldoAwalBank: 5000000
+            },
+            categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES))
+        };
+
+        let db = null;
+        let storage = null;
+        let isFirebaseActive = false;
+        let firestoreUnsubscribe = null;
+
+        let activeCatTab = 'penerimaan';
+        let confirmCallback = null;
         let cashflowChartInstance = null;
         let categoryChartInstance = null;
 
-        // --- 2. FIREBASE REALTIME SYNC ---
-        function initFirebaseListeners() {
-            db.ref('pmi_sumowono_data').on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (data) {
-                    appState.initialBalance = data.initialBalance || { kas: 0, bank: 0 };
-                    appState.signers = data.signers || appState.signers;
-                    appState.categories = data.categories || appState.categories;
-                    
-                    // Convert object firebase transactions to array
-                    if (data.transactions) {
-                        if (Array.isArray(data.transactions)) {
-                            appState.transactions = data.transactions.filter(Boolean);
-                        } else {
-                            appState.transactions = Object.keys(data.transactions).map(key => ({
-                                id: key,
-                                ...data.transactions[key]
-                            }));
-                        }
-                    } else {
-                        appState.transactions = [];
-                    }
+        // --- FIREBASE INITIALIZATION & SYNC ---
+        function initFirebase() {
+            const cfg = getFirebaseConfig();
+            try {
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(cfg);
                 }
-                renderAllViews();
-            }, (error) => {
-                showToast("Gagal menyinkronkan data Firebase", "error");
-            });
+                db = firebase.firestore();
+                storage = firebase.storage();
+                isFirebaseActive = true;
+                
+                // Enable offline cache persistence
+                db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+                
+                updateCloudStatusUI(true);
+                listenToFirestoreData();
+            } catch (err) {
+                console.warn("Firestore Mode Standalone / Fallback Local:", err);
+                isFirebaseActive = false;
+                updateCloudStatusUI(false);
+                loadFromLocalStorage();
+            }
         }
 
-        function saveToFirebase() {
-            db.ref('pmi_sumowono_data').set(appState)
-                .then(() => {
-                    showToast("Data berhasil disinkronkan ke Firebase");
-                })
-                .catch((error) => {
-                    showToast("Gagal menyimpan ke Firebase: " + error.message, "error");
+        function getFirebaseConfig() {
+            const raw = localStorage.getItem(FIREBASE_CFG_KEY);
+            if (raw) {
+                try { return JSON.parse(raw); } catch(e){}
+            }
+            return DEFAULT_FIREBASE_CONFIG;
+        }
+
+        function saveFirebaseConfig() {
+            const cfg = {
+                apiKey: document.getElementById('fbApiKey').value.trim(),
+                authDomain: document.getElementById('fbAuthDomain').value.trim(),
+                projectId: document.getElementById('fbProjectId').value.trim(),
+                storageBucket: document.getElementById('fbStorageBucket').value.trim(),
+                messagingSenderId: document.getElementById('fbSenderId').value.trim(),
+                appId: document.getElementById('fbAppId').value.trim()
+            };
+
+            localStorage.setItem(FIREBASE_CFG_KEY, JSON.stringify(cfg));
+            showToast("Konfigurasi Firebase disimpan! Memuat ulang sistem...");
+            setTimeout(() => { location.reload(); }, 1200);
+        }
+
+        function updateCloudStatusUI(active) {
+            const sideText = document.getElementById('sidebarCloudText');
+            const sideBadge = document.getElementById('sidebarCloudBadge');
+            const topText = document.getElementById('topCloudStatusText');
+            const topBadge = document.getElementById('topCloudStatusBadge');
+            const cfgBadge = document.getElementById('cfgStatusBadge');
+
+            if (active) {
+                if(sideText) sideText.textContent = "Firestore Cloud Active";
+                if(sideBadge) sideBadge.className = "p-2 rounded-lg bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-[11px] flex items-center space-x-2";
+                if(topText) topText.textContent = "Firestore Realtime Active";
+                if(topBadge) topBadge.className = "bg-emerald-50 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-200 flex items-center space-x-1.5";
+                if(cfgBadge) {
+                    cfgBadge.textContent = "Terhubung (Firestore Cloud)";
+                    cfgBadge.className = "text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800";
+                }
+            } else {
+                if(sideText) sideText.textContent = "Mode Storage Lokal";
+                if(sideBadge) sideBadge.className = "p-2 rounded-lg bg-amber-950/80 border border-amber-800 text-amber-300 text-[11px] flex items-center space-x-2";
+                if(topText) topText.textContent = "Local Storage Mode";
+                if(topBadge) topBadge.className = "bg-amber-50 text-amber-700 text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-200 flex items-center space-x-1.5";
+                if(cfgBadge) {
+                    cfgBadge.textContent = "Offline / Local Mode";
+                    cfgBadge.className = "text-xs font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-800";
+                }
+            }
+        }
+
+        function listenToFirestoreData() {
+            if (!db) return;
+
+            // Realtime listener for transactions
+            firestoreUnsubscribe = db.collection("transactions").onSnapshot((snapshot) => {
+                const cloudTxs = [];
+                snapshot.forEach((doc) => {
+                    cloudTxs.push({ id: doc.id, ...doc.data() });
                 });
-        }
-
-        // Initialize Application
-        document.addEventListener("DOMContentLoaded", () => {
-            const todayMonth = new Date().toISOString().slice(0, 7);
-            document.getElementById("filterBkuMonth").value = todayMonth;
-            document.getElementById("reportPeriod").value = todayMonth;
-            document.getElementById("txDate").valueAsDate = new Date();
-
-            initFirebaseListeners();
-        });
-
-        // --- 3. UI NAVIGATION & MODALS ---
-        function switchTab(tabName) {
-            document.querySelectorAll(".tab-content").forEach(el => el.classList.add("hidden"));
-            document.querySelectorAll(".nav-btn").forEach(btn => {
-                btn.classList.remove("bg-pmi-800", "text-white");
-                btn.classList.add("text-pmi-100");
+                appData.transactions = cloudTxs;
+                saveToLocalStorage(); // Mirror cache locally
+                renderAll();
+            }, (error) => {
+                console.error("Firestore Listen Error:", error);
+                showToast("Koneksi cloud terganggu. Memuat data lokal.", true);
+                loadFromLocalStorage();
             });
 
-            document.getElementById(`tab-${tabName}`).classList.remove("hidden");
-            const activeNav = document.getElementById(`nav-${tabName}`);
-            if (activeNav) {
-                activeNav.classList.add("bg-pmi-800", "text-white");
-                activeNav.classList.remove("text-pmi-100");
+            // Listen to settings
+            db.collection("settings").doc("app_settings").onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if(data.settings) appData.settings = data.settings;
+                    if(data.categories) appData.categories = data.categories;
+                    saveToLocalStorage();
+                    renderAll();
+                }
+            });
+        }
+
+        async function syncLocalToFirebase() {
+            if (!isFirebaseActive || !db) {
+                showToast("Firebase belum terhubung. Konfigurasi terlebih dahulu.", true);
+                return;
             }
 
-            const titles = {
-                dashboard: "Dashboard Keuangan",
-                penerimaan: "Penerimaan Kas (Inflow)",
-                pengeluaran: "Pengeluaran Kas (SPJ)",
-                bku: "Buku Kas Umum (BKU)",
-                laporan: "Cetak Laporan Pertanggungjawaban",
-                pengaturan: "Pengaturan & Master System"
-            };
-            document.getElementById("pageTitle").textContent = titles[tabName] || "Sistem Keuangan PMI";
-            closeMobileMenu();
+            try {
+                showToast("Mengunggah data ke Firestore...");
+                const batch = db.batch();
 
-            if (tabName === 'dashboard') renderCharts();
-            if (tabName === 'laporan') generateReportView();
+                appData.transactions.forEach((tx) => {
+                    const ref = db.collection("transactions").doc(tx.id || ('TX-' + Date.now()));
+                    batch.set(ref, tx, { merge: true });
+                });
+
+                const settingsRef = db.collection("settings").doc("app_settings");
+                batch.set(settingsRef, {
+                    settings: appData.settings,
+                    categories: appData.categories
+                }, { merge: true });
+
+                await batch.commit();
+                showToast("Selesai! Seluruh data lokal berhasil disinkronkan ke Cloud.");
+            } catch (e) {
+                showToast("Gagal sinkronisasi: " + e.message, true);
+            }
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+        }
+
+        function loadFromLocalStorage() {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                try {
+                    appData = JSON.parse(raw);
+                    if (!appData.categories) appData.categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+                } catch(e) {
+                    seedInitialSampleData();
+                }
+            } else {
+                seedInitialSampleData();
+            }
+        }
+
+        function seedInitialSampleData() {
+            appData.transactions = [
+                {
+                    id: 'TX-101',
+                    type: 'penerimaan',
+                    date: '2026-08-01',
+                    party: 'Bulan Dana PMI Desa Candigaron',
+                    category: 'Bulan Dana PMI',
+                    method: 'bank',
+                    amount: 3500000,
+                    description: 'Setoran Bulan Dana PMI Desa Candigaron Sumowono',
+                    proof: ''
+                },
+                {
+                    id: 'TX-102',
+                    type: 'penerimaan',
+                    date: '2026-08-02',
+                    party: 'Kecamatan Sumowono',
+                    category: 'Hibah Kecamatan / Pemkab',
+                    method: 'bank',
+                    amount: 5000000,
+                    description: 'Pencairan Hibah Operasional PMI Ranting Kecamatan',
+                    proof: ''
+                },
+                {
+                    id: 'TX-103',
+                    type: 'pengeluaran',
+                    date: '2026-08-03',
+                    party: 'Toko ATK Sumowono Makmur',
+                    category: 'Operasional & ATK Sekretariat',
+                    method: 'kas',
+                    amount: 450000,
+                    description: 'Pembelian Kertas A4, Tinta Printer & Buku Kas Sekretariat',
+                    proof: ''
+                }
+            ];
+            saveToLocalStorage();
         }
 
         function toggleMobileMenu() {
-            const sidebar = document.getElementById("appSidebar");
-            const backdrop = document.getElementById("mobileMenuBackdrop");
-            sidebar.classList.toggle("-translate-x-full");
-            backdrop.classList.toggle("hidden");
+            document.getElementById('appSidebar').classList.toggle('-translate-x-full');
+            document.getElementById('mobileMenuBackdrop').classList.toggle('hidden');
         }
 
         function closeMobileMenu() {
-            const sidebar = document.getElementById("appSidebar");
-            const backdrop = document.getElementById("mobileMenuBackdrop");
-            sidebar.classList.add("-translate-x-full");
-            backdrop.classList.add("hidden");
+            document.getElementById('appSidebar').classList.add('-translate-x-full');
+            document.getElementById('mobileMenuBackdrop').classList.add('hidden');
         }
 
-        function showToast(message, type = "success") {
-            const toast = document.getElementById("toast");
-            const toastMessage = document.getElementById("toastMessage");
-            const toastIcon = document.getElementById("toastIcon");
+        function formatRupiah(number) {
+            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(number || 0);
+        }
 
-            toastMessage.textContent = message;
-            if (type === "success") {
-                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
-            } else {
-                toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400 text-lg";
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const [y, m, d] = dateStr.split('-');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            return `${d} ${months[parseInt(m)-1]} ${y}`;
+        }
+
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const message = document.getElementById('toastMessage');
+
+            message.textContent = msg;
+            icon.className = isError ? "fa-solid fa-circle-exclamation text-rose-400 text-lg" : "fa-solid fa-circle-check text-emerald-400 text-lg";
+
+            toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+            }, 3200);
+        }
+
+        function switchTab(tabId) {
+            closeMobileMenu();
+
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-pmi-800', 'text-white');
+                btn.classList.add('text-pmi-100');
+            });
+
+            const activeTab = document.getElementById('tab-' + tabId);
+            const activeNav = document.getElementById('nav-' + tabId);
+
+            if (activeTab) activeTab.classList.remove('hidden');
+            if (activeNav) {
+                activeNav.classList.add('bg-pmi-800', 'text-white');
+                activeNav.classList.remove('text-pmi-100');
             }
 
-            toast.classList.remove("translate-y-20", "opacity-0");
-            setTimeout(() => {
-                toast.classList.add("translate-y-20", "opacity-0");
-            }, 3000);
+            const titles = {
+                dashboard: 'Dashboard Keuangan Cloud',
+                penerimaan: 'Penerimaan Kas (Inflow)',
+                pengeluaran: 'Pengeluaran & SPJ (Outflow)',
+                bku: 'Buku Kas Umum (BKU)',
+                laporan: 'Cetak Laporan LPJ',
+                pengaturan: 'Pengaturan & Cloud Firestore'
+            };
+            document.getElementById('pageTitle').textContent = titles[tabId] || 'Sistem Keuangan';
+
+            if (tabId === 'dashboard') renderDashboard();
+            if (tabId === 'penerimaan') renderPenerimaanTable();
+            if (tabId === 'pengeluaran') renderPengeluaranTable();
+            if (tabId === 'bku') renderBKU();
+            if (tabId === 'laporan') generateReportView();
+            if (tabId === 'pengaturan') populateSettingsForm();
         }
 
-        // Format Currency Rp
-        function formatRp(val) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
-        }
-
-        // --- 4. RENDERERS & CALCULATIONS ---
-        function renderAllViews() {
+        function renderAll() {
+            updateHeaderAndSidebar();
             renderDashboard();
-            renderPenerimaan();
-            renderPengeluaran();
+            renderPenerimaanTable();
+            renderPengeluaranTable();
             renderBKU();
-            renderSettingsForm();
-            renderCategoriesMaster();
+            generateReportView();
+            populateSettingsForm();
         }
 
-        function calculateSummaries() {
+        function updateHeaderAndSidebar() {
+            document.getElementById('sidebarBendahara').textContent = appData.settings.bendaharaName || 'Bendahara PMI';
+        }
+
+        function calculateFinancials() {
             let totalMasuk = 0;
             let totalKeluar = 0;
-            let masukKas = appState.initialBalance.kas || 0;
-            let masukBank = appState.initialBalance.bank || 0;
+            let saldoKas = parseFloat(appData.settings.saldoAwalKas) || 0;
+            let saldoBank = parseFloat(appData.settings.saldoAwalBank) || 0;
 
             const now = new Date();
-            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const currentYearMonth = now.toISOString().substring(0, 7);
+
             let masukBulanIni = 0;
             let keluarBulanIni = 0;
 
-            appState.transactions.forEach(t => {
-                const amt = Number(t.amount) || 0;
-                const tym = t.date ? t.date.substring(0, 7) : "";
+            const sorted = [...appData.transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
 
-                if (t.type === 'penerimaan') {
+            sorted.forEach(tx => {
+                const amt = parseFloat(tx.amount) || 0;
+                const txYM = tx.date ? tx.date.substring(0, 7) : '';
+
+                if (tx.type === 'penerimaan') {
                     totalMasuk += amt;
-                    if (t.method === 'kas') masukKas += amt;
-                    else masukBank += amt;
-
-                    if (tym === currentYearMonth) masukBulanIni += amt;
-                } else if (t.type === 'pengeluaran') {
+                    if (tx.method === 'kas') saldoKas += amt;
+                    if (tx.method === 'bank') saldoBank += amt;
+                    if (txYM === currentYearMonth) masukBulanIni += amt;
+                } else {
                     totalKeluar += amt;
-                    if (t.method === 'kas') masukKas -= amt;
-                    else masukBank -= amt;
-
-                    if (tym === currentYearMonth) keluarBulanIni += amt;
+                    if (tx.method === 'kas') saldoKas -= amt;
+                    if (tx.method === 'bank') saldoBank -= amt;
+                    if (txYM === currentYearMonth) keluarBulanIni += amt;
                 }
             });
 
-            return {
-                saldoTunai: masukKas,
-                saldoBank: masukBank,
-                totalSaldo: masukKas + masukBank,
-                masukBulanIni,
-                keluarBulanIni,
-                totalMasuk,
-                totalKeluar
-            };
+            return { totalMasuk, totalKeluar, saldoKas, saldoBank, totalSaldo: saldoKas + saldoBank, masukBulanIni, keluarBulanIni };
         }
 
         function renderDashboard() {
-            const summary = calculateSummaries();
-            document.getElementById("dashTotalSaldo").textContent = formatRp(summary.totalSaldo);
-            document.getElementById("dashSaldoTunai").textContent = formatRp(summary.saldoTunai);
-            document.getElementById("dashSaldoBank").textContent = formatRp(summary.saldoBank);
-            document.getElementById("dashMasukBulanIni").textContent = formatRp(summary.masukBulanIni);
-            document.getElementById("dashKeluarBulanIni").textContent = formatRp(summary.keluarBulanIni);
+            const fin = calculateFinancials();
 
-            // Transaksi Terakhir (5 Data)
-            const recent = [...appState.transactions]
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
+            document.getElementById('dashTotalSaldo').textContent = formatRupiah(fin.totalSaldo);
+            document.getElementById('dashSaldoTunai').textContent = formatRupiah(fin.saldoKas);
+            document.getElementById('dashSaldoBank').textContent = formatRupiah(fin.saldoBank);
+            document.getElementById('dashMasukBulanIni').textContent = formatRupiah(fin.masukBulanIni);
+            document.getElementById('dashKeluarBulanIni').textContent = formatRupiah(fin.keluarBulanIni);
+
+            const recent = [...appData.transactions]
+                .sort((a,b) => new Date(b.date) - new Date(a.date))
                 .slice(0, 5);
 
-            const tbody = document.getElementById("recentTransactionsTable");
-            tbody.innerHTML = recent.length === 0 
-                ? `<tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Belum ada transaksi recorded</td></tr>`
-                : recent.map(t => `
-                    <tr class="hover:bg-slate-50 transition">
-                        <td class="p-3 px-4 font-mono text-xs">${t.date}</td>
-                        <td class="p-3 px-4">
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type === 'penerimaan' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                                ${t.type === 'penerimaan' ? 'Masuk' : 'Keluar'}
-                            </span>
-                        </td>
-                        <td class="p-3 px-4">
-                            <div class="font-semibold text-slate-800">${t.category}</div>
-                            <div class="text-xs text-slate-400 truncate max-w-xs">${t.description}</div>
-                        </td>
-                        <td class="p-3 px-4 uppercase text-xs font-semibold ${t.method === 'kas' ? 'text-emerald-600' : 'text-blue-600'}">${t.method}</td>
-                        <td class="p-3 px-4 text-right font-bold ${t.type === 'penerimaan' ? 'text-emerald-600' : 'text-rose-600'}">
-                            ${t.type === 'penerimaan' ? '+' : '-'}${formatRp(t.amount)}
-                        </td>
-                    </tr>
-                `).join("");
+            const tbody = document.getElementById('recentTransactionsTable');
+            tbody.innerHTML = '';
+
+            if (recent.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400 italic">Belum ada transaksi di database cloud.</td></tr>`;
+            } else {
+                recent.forEach(tx => {
+                    const isPenerimaan = tx.type === 'penerimaan';
+                    const badgeClass = isPenerimaan ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800';
+                    const sign = isPenerimaan ? '+' : '-';
+                    const amountClass = isPenerimaan ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="p-3.5 px-4 text-xs font-medium">${formatDate(tx.date)}</td>
+                            <td class="p-3.5 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${badgeClass}">${tx.type}</span></td>
+                            <td class="p-3.5 px-4">
+                                <div class="font-semibold text-slate-800">${tx.category}</div>
+                                <div class="text-xs text-slate-500">${tx.description}</div>
+                            </td>
+                            <td class="p-3.5 px-4 uppercase text-xs text-slate-500 font-medium">${tx.method}</td>
+                            <td class="p-3.5 px-4 text-right ${amountClass}">${sign} ${formatRupiah(tx.amount)}</td>
+                        </tr>
+                    `;
+                });
+            }
 
             renderCharts();
         }
 
         function renderCharts() {
-            if (typeof Chart === 'undefined') return;
-
-            // Arus Kas Line Chart
             const ctx1 = document.getElementById('cashflowChart');
-            if (ctx1) {
-                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                const currentYear = new Date().getFullYear();
-                const inData = new Array(12).fill(0);
-                const outData = new Array(12).fill(0);
+            if(!ctx1) return;
+            
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const incomeData = new Array(12).fill(0);
+            const expenseData = new Array(12).fill(0);
 
-                appState.transactions.forEach(t => {
-                    const d = new Date(t.date);
-                    if (d.getFullYear() === currentYear) {
-                        const m = d.getMonth();
-                        if (t.type === 'penerimaan') inData[m] += Number(t.amount);
-                        else outData[m] += Number(t.amount);
-                    }
-                });
+            appData.transactions.forEach(tx => {
+                if(!tx.date) return;
+                const m = parseInt(tx.date.split('-')[1]) - 1;
+                if(m >= 0 && m < 12) {
+                    if(tx.type === 'penerimaan') incomeData[m] += parseFloat(tx.amount);
+                    else expenseData[m] += parseFloat(tx.amount);
+                }
+            });
 
-                if (cashflowChartInstance) cashflowChartInstance.destroy();
-                cashflowChartInstance = new Chart(ctx1, {
-                    type: 'line',
-                    data: {
-                        labels: months,
-                        datasets: [
-                            { label: 'Penerimaan (Rp)', data: inData, borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.1)', fill: true, tension: 0.3 },
-                            { label: 'Pengeluaran (Rp)', data: outData, borderColor: '#e11d48', backgroundColor: 'rgba(225, 29, 72, 0.1)', fill: true, tension: 0.3 }
-                        ]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
-            }
+            if (cashflowChartInstance) cashflowChartInstance.destroy();
+            cashflowChartInstance = new Chart(ctx1.getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        { label: 'Penerimaan', data: incomeData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 },
+                        { label: 'Pengeluaran', data: expenseData, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', fill: true, tension: 0.3 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+            });
 
-            // Pie Chart Category Outflow
             const ctx2 = document.getElementById('categoryChart');
-            if (ctx2) {
-                const catTotals = {};
-                appState.transactions.filter(t => t.type === 'pengeluaran').forEach(t => {
-                    catTotals[t.category] = (catTotals[t.category] || 0) + Number(t.amount);
-                });
+            if(!ctx2) return;
 
-                const labels = Object.keys(catTotals);
-                const data = Object.values(catTotals);
+            const categoryMap = {};
+            appData.transactions.filter(t => t.type === 'pengeluaran').forEach(tx => {
+                categoryMap[tx.category] = (categoryMap[tx.category] || 0) + parseFloat(tx.amount);
+            });
 
-                if (categoryChartInstance) categoryChartInstance.destroy();
-                categoryChartInstance = new Chart(ctx2, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels.length ? labels : ['Belum Ada Data'],
-                        datasets: [{
-                            data: data.length ? data : [1],
-                            backgroundColor: ['#dc2626', '#2563eb', '#d97706', '#059669', '#9333ea', '#64748b']
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
-                });
+            const pieLabels = Object.keys(categoryMap);
+            const pieData = Object.values(categoryMap);
+
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            categoryChartInstance = new Chart(ctx2.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: pieLabels.length ? pieLabels : ['Belum ada data'],
+                    datasets: [{
+                        data: pieData.length ? pieData : [1],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981', '#8b5cf6', '#ec4899', '#cbd5e1']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
+            });
+        }
+
+        function renderPenerimaanTable() {
+            const tbody = document.getElementById('penerimaanTable');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            const data = appData.transactions.filter(t => t.type === 'penerimaan')
+                .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">Belum ada data penerimaan.</td></tr>`;
+                return;
             }
-        }
 
-        function renderPenerimaan() {
-            const list = appState.transactions.filter(t => t.type === 'penerimaan').sort((a, b) => new Date(b.date) - new Date(a.date));
-            const tbody = document.getElementById("penerimaanTable");
-            tbody.innerHTML = list.length === 0 
-                ? `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">Belum ada data penerimaan kas.</td></tr>`
-                : list.map(t => `
+            data.forEach(tx => {
+                tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition">
-                        <td class="p-3.5 px-4 font-mono text-xs">${t.date}</td>
-                        <td class="p-3.5 px-4 font-semibold text-slate-800">${t.party}</td>
-                        <td class="p-3.5 px-4"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">${t.category}</span></td>
-                        <td class="p-3.5 px-4 text-xs text-slate-600">${t.description}</td>
-                        <td class="p-3.5 px-4 uppercase text-xs font-bold ${t.method === 'kas' ? 'text-emerald-600' : 'text-blue-600'}">${t.method}</td>
-                        <td class="p-3.5 px-4 text-right font-bold text-emerald-600">${formatRp(t.amount)}</td>
-                        <td class="p-3.5 px-4 text-center no-print space-x-1">
-                            <button onclick="editTransaction('${t.id}')" class="text-blue-600 hover:text-blue-800 p-1"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="deleteTransaction('${t.id}')" class="text-rose-600 hover:text-rose-800 p-1"><i class="fa-solid fa-trash"></i></button>
+                        <td class="p-3.5 px-4 font-medium text-xs">${formatDate(tx.date)}</td>
+                        <td class="p-3.5 px-4 font-semibold text-slate-800">${tx.party}</td>
+                        <td class="p-3.5 px-4"><span class="bg-slate-100 text-slate-700 text-[11px] px-2 py-0.5 rounded">${tx.category}</span></td>
+                        <td class="p-3.5 px-4 text-xs text-slate-600">${tx.description}</td>
+                        <td class="p-3.5 px-4 uppercase text-xs font-semibold text-slate-500">${tx.method}</td>
+                        <td class="p-3.5 px-4 text-right font-bold text-emerald-600">${formatRupiah(tx.amount)}</td>
+                        <td class="p-3.5 px-4 text-center no-print">
+                            <button onclick="deleteTransaction('${tx.id}')" class="text-rose-500 hover:text-rose-700 p-1 transition" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
                         </td>
                     </tr>
-                `).join("");
+                `;
+            });
         }
 
-        function renderPengeluaran() {
-            const list = appState.transactions.filter(t => t.type === 'pengeluaran').sort((a, b) => new Date(b.date) - new Date(a.date));
-            const tbody = document.getElementById("pengeluaranTable");
-            tbody.innerHTML = list.length === 0 
-                ? `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">Belum ada data pengeluaran/SPJ.</td></tr>`
-                : list.map(t => `
+        function renderPengeluaranTable() {
+            const tbody = document.getElementById('pengeluaranTable');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            const data = appData.transactions.filter(t => t.type === 'pengeluaran')
+                .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+            if (data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic">Belum ada data pengeluaran/SPJ.</td></tr>`;
+                return;
+            }
+
+            data.forEach(tx => {
+                const proofBtn = tx.proof ? `<button onclick="viewProof('${tx.proof}')" class="text-blue-600 hover:underline text-xs ml-1"><i class="fa-solid fa-paperclip"></i> Struk</button>` : '';
+                tbody.innerHTML += `
                     <tr class="hover:bg-slate-50 transition">
-                        <td class="p-3.5 px-4 font-mono text-xs">${t.date}</td>
-                        <td class="p-3.5 px-4 font-semibold text-slate-800">${t.party}</td>
-                        <td class="p-3.5 px-4"><span class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded text-xs font-medium">${t.category}</span></td>
-                        <td class="p-3.5 px-4 text-xs text-slate-600">${t.description}</td>
-                        <td class="p-3.5 px-4 uppercase text-xs font-bold ${t.method === 'kas' ? 'text-emerald-600' : 'text-blue-600'}">${t.method}</td>
-                        <td class="p-3.5 px-4 text-right font-bold text-rose-600">${formatRp(t.amount)}</td>
-                        <td class="p-3.5 px-4 text-center no-print space-x-1">
-                            <button onclick="editTransaction('${t.id}')" class="text-blue-600 hover:text-blue-800 p-1"><i class="fa-solid fa-pen"></i></button>
-                            <button onclick="deleteTransaction('${t.id}')" class="text-rose-600 hover:text-rose-800 p-1"><i class="fa-solid fa-trash"></i></button>
+                        <td class="p-3.5 px-4 font-medium text-xs">${formatDate(tx.date)}</td>
+                        <td class="p-3.5 px-4 font-semibold text-slate-800">${tx.party}</td>
+                        <td class="p-3.5 px-4"><span class="bg-rose-50 text-rose-700 text-[11px] px-2 py-0.5 rounded font-medium">${tx.category}</span></td>
+                        <td class="p-3.5 px-4 text-xs text-slate-600">${tx.description} ${proofBtn}</td>
+                        <td class="p-3.5 px-4 uppercase text-xs font-semibold text-slate-500">${tx.method}</td>
+                        <td class="p-3.5 px-4 text-right font-bold text-rose-600">${formatRupiah(tx.amount)}</td>
+                        <td class="p-3.5 px-4 text-center no-print">
+                            <button onclick="deleteTransaction('${tx.id}')" class="text-rose-500 hover:text-rose-700 p-1 transition" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
                         </td>
                     </tr>
-                `).join("");
+                `;
+            });
         }
 
         function renderBKU() {
-            const filterMonth = document.getElementById("filterBkuMonth").value;
-            const filterMethod = document.getElementById("filterBkuMethod").value;
+            const monthFilter = document.getElementById('filterBkuMonth').value;
+            const methodFilter = document.getElementById('filterBkuMethod').value;
+            const tbody = document.getElementById('bkuTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
 
-            let filtered = [...appState.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
+            let sorted = [...appData.transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
 
-            if (filterMonth) {
-                filtered = filtered.filter(t => t.date && t.date.startsWith(filterMonth));
-            }
-            if (filterMethod !== 'all') {
-                filtered = filtered.filter(t => t.method === filterMethod);
-            }
+            if (monthFilter) sorted = sorted.filter(t => t.date && t.date.substring(0, 7) === monthFilter);
+            if (methodFilter !== 'all') sorted = sorted.filter(t => t.method === methodFilter);
 
-            let runningSaldo = 0;
-            if (filterMethod === 'all') runningSaldo = (appState.initialBalance.kas || 0) + (appState.initialBalance.bank || 0);
-            else if (filterMethod === 'kas') runningSaldo = appState.initialBalance.kas || 0;
-            else if (filterMethod === 'bank') runningSaldo = appState.initialBalance.bank || 0;
+            let runningBalance = (parseFloat(appData.settings.saldoAwalKas) || 0) + (parseFloat(appData.settings.saldoAwalBank) || 0);
+            if (methodFilter === 'kas') runningBalance = parseFloat(appData.settings.saldoAwalKas) || 0;
+            if (methodFilter === 'bank') runningBalance = parseFloat(appData.settings.saldoAwalBank) || 0;
 
-            let totalD = 0;
-            let totalK = 0;
-
-            const tbody = document.getElementById("bkuTableBody");
-            let html = `
-                <tr class="bg-slate-50 font-semibold text-slate-700">
-                    <td class="p-3 px-4 text-center">-</td>
-                    <td class="p-3 px-4">-</td>
-                    <td class="p-3 px-4 font-sans font-bold uppercase">SALDO AWAL KEUANGAN</td>
-                    <td class="p-3 px-4 uppercase font-bold text-slate-500">${filterMethod}</td>
-                    <td class="p-3 px-4 text-right text-emerald-600">-</td>
-                    <td class="p-3 px-4 text-right text-rose-600">-</td>
-                    <td class="p-3 px-4 text-right font-bold">${formatRp(runningSaldo)}</td>
+            tbody.innerHTML += `
+                <tr class="bg-slate-50 font-bold">
+                    <td class="p-2.5 px-4 text-center">-</td>
+                    <td class="p-2.5 px-4">-</td>
+                    <td class="p-2.5 px-4 font-sans font-bold text-slate-700">SALDO AWAL KAS & BANK</td>
+                    <td class="p-2.5 px-4 uppercase text-slate-400">${methodFilter}</td>
+                    <td class="p-2.5 px-4 text-right">-</td>
+                    <td class="p-2.5 px-4 text-right">-</td>
+                    <td class="p-2.5 px-4 text-right font-extrabold text-blue-900">${formatRupiah(runningBalance)}</td>
                 </tr>
             `;
 
-            if (filtered.length === 0) {
-                html += `<tr><td colspan="7" class="p-4 text-center text-slate-400 italic font-sans">Tidak ada catatan transaksi pada filter ini.</td></tr>`;
-            } else {
-                filtered.forEach((t, idx) => {
-                    const amt = Number(t.amount) || 0;
-                    let debet = 0;
-                    let kredit = 0;
+            let totDebet = 0;
+            let totKredit = 0;
 
-                    if (t.type === 'penerimaan') {
-                        debet = amt;
-                        runningSaldo += amt;
-                        totalD += amt;
-                    } else {
-                        kredit = amt;
-                        runningSaldo -= amt;
-                        totalK += amt;
-                    }
+            sorted.forEach((tx, idx) => {
+                const amt = parseFloat(tx.amount) || 0;
+                let debet = 0, kredit = 0;
 
-                    html += `
-                        <tr class="hover:bg-slate-50 transition">
-                            <td class="p-3 px-4 text-center font-sans text-slate-400">${idx + 1}</td>
-                            <td class="p-3 px-4 font-mono">${t.date}</td>
-                            <td class="p-3 px-4 font-sans">
-                                <div class="font-bold text-slate-800">${t.party}</div>
-                                <div class="text-slate-500 text-xs">${t.description} (${t.category})</div>
-                            </td>
-                            <td class="p-3 px-4 uppercase font-bold text-xs ${t.method === 'kas' ? 'text-emerald-600' : 'text-blue-600'}">${t.method}</td>
-                            <td class="p-3 px-4 text-right text-emerald-600 font-semibold">${debet > 0 ? formatRp(debet) : '-'}</td>
-                            <td class="p-3 px-4 text-right text-rose-600 font-semibold">${kredit > 0 ? formatRp(kredit) : '-'}</td>
-                            <td class="p-3 px-4 text-right font-bold text-slate-800">${formatRp(runningSaldo)}</td>
-                        </tr>
-                    `;
-                });
-            }
+                if (tx.type === 'penerimaan') {
+                    debet = amt; totDebet += amt; runningBalance += amt;
+                } else {
+                    kredit = amt; totKredit += amt; runningBalance -= amt;
+                }
 
-            tbody.innerHTML = html;
-            document.getElementById("bkuTotalDebet").textContent = formatRp(totalD);
-            document.getElementById("bkuTotalKredit").textContent = formatRp(totalK);
-            document.getElementById("bkuSaldoAkhir").textContent = formatRp(runningSaldo);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-2.5 px-4 text-center text-slate-400">${idx + 1}</td>
+                        <td class="p-2.5 px-4 font-sans text-slate-700">${formatDate(tx.date)}</td>
+                        <td class="p-2.5 px-4 font-sans">
+                            <span class="font-bold text-slate-800">${tx.category}</span> - ${tx.description} (${tx.party})
+                        </td>
+                        <td class="p-2.5 px-4 uppercase text-slate-500">${tx.method}</td>
+                        <td class="p-2.5 px-4 text-right text-emerald-600 font-medium">${debet > 0 ? formatRupiah(debet) : '-'}</td>
+                        <td class="p-2.5 px-4 text-right text-rose-600 font-medium">${kredit > 0 ? formatRupiah(kredit) : '-'}</td>
+                        <td class="p-2.5 px-4 text-right font-bold text-slate-800">${formatRupiah(runningBalance)}</td>
+                    </tr>
+                `;
+            });
+
+            document.getElementById('bkuTotalDebet').textContent = formatRupiah(totDebet);
+            document.getElementById('bkuTotalKredit').textContent = formatRupiah(totKredit);
+            document.getElementById('bkuSaldoAkhir').textContent = formatRupiah(runningBalance);
         }
 
         function resetBkuFilter() {
-            document.getElementById("filterBkuMonth").value = "";
-            document.getElementById("filterBkuMethod").value = "all";
+            document.getElementById('filterBkuMonth').value = '';
+            document.getElementById('filterBkuMethod').value = 'all';
             renderBKU();
         }
 
-        // --- 5. TRANSACTIONS CRUD ---
-        function openModalTransaction(defaultType = 'penerimaan') {
-            document.getElementById("txId").value = "";
-            document.getElementById("txType").value = defaultType;
-            document.getElementById("txDate").valueAsDate = new Date();
-            document.getElementById("txParty").value = "";
-            document.getElementById("txAmount").value = "";
-            document.getElementById("txDescription").value = "";
-            document.getElementById("txMethod").value = "kas";
+        function generateReportView() {
+            const reportType = document.getElementById('reportType').value;
+            const period = document.getElementById('reportPeriod').value;
+            const location = document.getElementById('reportLocation').value || 'Sumowono';
+            const printContainer = document.getElementById('printTableContainer');
+            if(!printContainer) return;
 
-            handleTypeChange();
-            document.getElementById("modalTransaction").classList.remove("hidden");
+            const fin = calculateFinancials();
+
+            document.getElementById('printSekcamName').textContent = appData.settings.sekcamName || '-';
+            document.getElementById('printSekcamNip').textContent = 'NIP. ' + (appData.settings.sekcamNip || '-');
+            document.getElementById('printBendaharaName').textContent = appData.settings.bendaharaName || '-';
+
+            const now = new Date();
+            const dateFormatted = `${now.getDate()} ${['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][now.getMonth()]} ${now.getFullYear()}`;
+            document.getElementById('printDateLoc').textContent = `${location}, ${dateFormatted}`;
+
+            document.getElementById('printKasTunai').textContent = formatRupiah(fin.saldoKas);
+            document.getElementById('printKasBank').textContent = formatRupiah(fin.saldoBank);
+            document.getElementById('printTotalKas').textContent = formatRupiah(fin.totalSaldo);
+
+            let filterTitle = 'Semua Transaksi';
+            let txs = [...appData.transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            if (period) {
+                const [yr, mo] = period.split('-');
+                const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+                filterTitle = `Bulan ${monthNames[parseInt(mo)-1]} ${yr}`;
+                txs = txs.filter(t => t.date && t.date.substring(0, 7) === period);
+            }
+
+            if (reportType === 'bku') {
+                document.getElementById('printDocTitle').textContent = 'LAPORAN BUKU KAS UMUM (BKU)';
+                document.getElementById('printDocSubtitle').textContent = `Periode: ${filterTitle}`;
+
+                let html = `
+                    <table class="w-full text-xs text-left border-collapse border border-slate-300">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-800 font-bold border-b border-slate-300 text-center uppercase">
+                                <th class="border border-slate-300 p-2 w-8">No</th>
+                                <th class="border border-slate-300 p-2 w-24">Tanggal</th>
+                                <th class="border border-slate-300 p-2">Uraian / Keterangan Transaksi</th>
+                                <th class="border border-slate-300 p-2 w-28 text-right">Penerimaan (D)</th>
+                                <th class="border border-slate-300 p-2 w-28 text-right">Pengeluaran (K)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                let totD = 0, totK = 0;
+                if (txs.length === 0) {
+                    html += `<tr><td colspan="5" class="p-4 text-center italic text-slate-400">Tidak ada data transaksi pada periode ini.</td></tr>`;
+                } else {
+                    txs.forEach((tx, i) => {
+                        const amt = parseFloat(tx.amount) || 0;
+                        let deb = tx.type === 'penerimaan' ? amt : 0;
+                        let kre = tx.type === 'pengeluaran' ? amt : 0;
+                        totD += deb; totK += kre;
+
+                        html += `
+                            <tr class="border-b border-slate-200">
+                                <td class="border border-slate-300 p-2 text-center">${i+1}</td>
+                                <td class="border border-slate-300 p-2">${formatDate(tx.date)}</td>
+                                <td class="border border-slate-300 p-2"><span class="font-bold">${tx.category}</span>: ${tx.description} (${tx.party})</td>
+                                <td class="border border-slate-300 p-2 text-right">${deb > 0 ? formatRupiah(deb) : '-'}</td>
+                                <td class="border border-slate-300 p-2 text-right">${kre > 0 ? formatRupiah(kre) : '-'}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                html += `
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-slate-100 font-bold border-t-2 border-slate-400">
+                                <td colspan="3" class="border border-slate-300 p-2 text-right uppercase">Jumlah Total:</td>
+                                <td class="border border-slate-300 p-2 text-right text-emerald-800">${formatRupiah(totD)}</td>
+                                <td class="border border-slate-300 p-2 text-right text-rose-800">${formatRupiah(totK)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                `;
+                printContainer.innerHTML = html;
+
+            } else if (reportType === 'kategori') {
+                document.getElementById('printDocTitle').textContent = 'LAPORAN REKAPITULASI PER KATEGORI';
+                document.getElementById('printDocSubtitle').textContent = `Periode: ${filterTitle}`;
+
+                const categoryMap = {};
+                txs.forEach(tx => {
+                    if(!categoryMap[tx.category]) {
+                        categoryMap[tx.category] = { type: tx.type, amount: 0, count: 0 };
+                    }
+                    categoryMap[tx.category].amount += parseFloat(tx.amount);
+                    categoryMap[tx.category].count += 1;
+                });
+
+                let html = `
+                    <table class="w-full text-xs text-left border-collapse border border-slate-300">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-800 font-bold border-b border-slate-300 uppercase">
+                                <th class="border border-slate-300 p-2 w-8 text-center">No</th>
+                                <th class="border border-slate-300 p-2">Kategori Transaksi</th>
+                                <th class="border border-slate-300 p-2 w-24 text-center">Jenis</th>
+                                <th class="border border-slate-300 p-2 w-20 text-center">Frekuensi</th>
+                                <th class="border border-slate-300 p-2 w-32 text-right">Total Nominal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                const keys = Object.keys(categoryMap);
+                if (keys.length === 0) {
+                    html += `<tr><td colspan="5" class="p-4 text-center italic text-slate-400">Tidak ada data transaksi.</td></tr>`;
+                } else {
+                    keys.forEach((cat, idx) => {
+                        const item = categoryMap[cat];
+                        html += `
+                            <tr class="border-b border-slate-200">
+                                <td class="border border-slate-300 p-2 text-center">${idx + 1}</td>
+                                <td class="border border-slate-300 p-2 font-semibold">${cat}</td>
+                                <td class="border border-slate-300 p-2 text-center uppercase font-bold text-[10px] ${item.type === 'penerimaan' ? 'text-emerald-700' : 'text-rose-700'}">${item.type}</td>
+                                <td class="border border-slate-300 p-2 text-center">${item.count} Transaksi</td>
+                                <td class="border border-slate-300 p-2 text-right font-bold">${formatRupiah(item.amount)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+                html += `</tbody></table>`;
+                printContainer.innerHTML = html;
+            }
+        }
+
+        function openModalTransaction(defaultType = 'penerimaan') {
+            document.getElementById('txForm').reset();
+            document.getElementById('txId').value = '';
+            document.getElementById('proofPreviewContainer').classList.add('hidden');
+
+            const radio = document.querySelector(`input[name="txType"][value="${defaultType}"]`);
+            if (radio) radio.checked = true;
+
+            document.getElementById('txDate').value = new Date().toISOString().split('T')[0];
+            updateCategoryOptions();
+            document.getElementById('modalTransaction').classList.remove('hidden');
         }
 
         function closeModalTransaction() {
-            document.getElementById("modalTransaction").classList.add("hidden");
+            document.getElementById('modalTransaction').classList.add('hidden');
         }
 
-        function handleTypeChange() {
-            const type = document.getElementById("txType").value;
-            const labelParty = document.getElementById("labelTxParty");
-            const catSelect = document.getElementById("txCategory");
+        function updateCategoryOptions() {
+            const typeRadio = document.querySelector('input[name="txType"]:checked');
+            const type = typeRadio ? typeRadio.value : 'penerimaan';
+            const select = document.getElementById('txCategory');
+            const lblParty = document.getElementById('lblParty');
 
-            if (type === 'penerimaan') {
-                labelParty.textContent = "Sumber Dana / Donatur";
-                catSelect.innerHTML = appState.categories.penerimaan.map(c => `<option value="${c}">${c}</option>`).join("");
-            } else {
-                labelParty.textContent = "Penerima / Toko / Vendor";
-                catSelect.innerHTML = appState.categories.pengeluaran.map(c => `<option value="${c}">${c}</option>`).join("");
+            select.innerHTML = '';
+            const categories = appData.categories[type] || DEFAULT_CATEGORIES[type];
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+
+            lblParty.textContent = type === 'penerimaan' ? 'Sumber Dana / Donatur *' : 'Penerima / Toko / Vendor *';
+        }
+
+        function previewProofImage(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    document.getElementById('proofPreviewImg').src = evt.target.result;
+                    document.getElementById('proofPreviewContainer').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
             }
         }
 
-        function handleSaveTransaction(e) {
+        async function handleSaveTransaction(e) {
             e.preventDefault();
-            const id = document.getElementById("txId").value || 'tx_' + Date.now();
+
+            const type = document.querySelector('input[name="txType"]:checked').value;
+            const date = document.getElementById('txDate').value;
+            const amount = parseFloat(document.getElementById('txAmount').value);
+            const party = document.getElementById('txParty').value;
+            const method = document.getElementById('txMethod').value;
+            const category = document.getElementById('txCategory').value;
+            const description = document.getElementById('txDescription').value;
+            const proofFile = document.getElementById('txProof').files[0];
+
+            if (!amount || amount <= 0) {
+                showToast('Nominal transaksi harus lebih dari 0', true);
+                return;
+            }
+
+            const txId = 'TX-' + Date.now();
+            let proofUrl = '';
+
+            // Handle Cloud Storage Upload if file attached
+            if (proofFile && isFirebaseActive && storage) {
+                try {
+                    showToast("Mengunggah foto nota ke Cloud Storage...");
+                    const ref = storage.ref(`nota_spj/${txId}_${proofFile.name}`);
+                    await ref.put(proofFile);
+                    proofUrl = await ref.getDownloadURL();
+                } catch(e) {
+                    console.warn("Storage upload failed, falling back to Base64:", e);
+                    proofUrl = document.getElementById('proofPreviewImg').src || '';
+                }
+            } else if (document.getElementById('proofPreviewImg').src) {
+                proofUrl = document.getElementById('proofPreviewImg').src;
+            }
+
             const newTx = {
-                id,
-                type: document.getElementById("txType").value,
-                date: document.getElementById("txDate").value,
-                party: document.getElementById("txParty").value,
-                category: document.getElementById("txCategory").value,
-                method: document.getElementById("txMethod").value,
-                amount: Number(document.getElementById("txAmount").value),
-                description: document.getElementById("txDescription").value
+                id: txId,
+                type,
+                date,
+                amount,
+                party,
+                method,
+                category,
+                description,
+                proof: proofUrl.startsWith('http') || proofUrl.startsWith('data:') ? proofUrl : ''
             };
 
-            const idx = appState.transactions.findIndex(t => t.id === id);
-            if (idx >= 0) {
-                appState.transactions[idx] = newTx;
+            if (isFirebaseActive && db) {
+                try {
+                    await db.collection("transactions").doc(txId).set(newTx);
+                    showToast('Transaksi tersimpan ke Cloud Firestore!');
+                } catch(e) {
+                    showToast('Gagal simpan Cloud. Menyimpan lokal...', true);
+                    appData.transactions.push(newTx);
+                    saveToLocalStorage();
+                    renderAll();
+                }
             } else {
-                appState.transactions.push(newTx);
+                appData.transactions.push(newTx);
+                saveToLocalStorage();
+                renderAll();
+                showToast('Transaksi disimpan ke Storage Lokal!');
             }
 
-            saveToFirebase();
             closeModalTransaction();
         }
 
-        function editTransaction(id) {
-            const tx = appState.transactions.find(t => t.id === id);
-            if (!tx) return;
-
-            document.getElementById("txId").value = tx.id;
-            document.getElementById("txType").value = tx.type;
-            handleTypeChange();
-
-            document.getElementById("txDate").value = tx.date;
-            document.getElementById("txParty").value = tx.party;
-            document.getElementById("txCategory").value = tx.category;
-            document.getElementById("txMethod").value = tx.method;
-            document.getElementById("txAmount").value = tx.amount;
-            document.getElementById("txDescription").value = tx.description;
-
-            document.getElementById("modalTransaction").classList.remove("hidden");
-        }
-
-        function deleteTransaction(id) {
-            if (confirm("Apakah Anda yakin ingin menghapus transaksi ini dari Firebase?")) {
-                appState.transactions = appState.transactions.filter(t => t.id !== id);
-                saveToFirebase();
-            }
-        }
-
-        // --- 6. MASTER & SETTINGS MANAGEMENT ---
-        function renderSettingsForm() {
-            document.getElementById("masterSaldoKas").value = appState.initialBalance.kas || 0;
-            document.getElementById("masterSaldoBank").value = appState.initialBalance.bank || 0;
-
-            const s = appState.signers;
-            document.getElementById("signerKetuaNama").value = s.ketua?.nama || "";
-            document.getElementById("signerKetuaNip").value = s.ketua?.nip || "";
-            document.getElementById("signerKetuaJabatan").value = s.ketua?.jabatan || "";
-
-            document.getElementById("signerBendaharaNama").value = s.bendahara?.nama || "";
-            document.getElementById("signerBendaharaNip").value = s.bendahara?.nip || "";
-            document.getElementById("signerBendaharaJabatan").value = s.bendahara?.jabatan || "";
-
-            document.getElementById("sidebarBendahara").textContent = s.bendahara?.nama || "Bendahara PMI";
-        }
-
-        function handleSaveSaldoAwal(e) {
-            e.preventDefault();
-            appState.initialBalance = {
-                kas: Number(document.getElementById("masterSaldoKas").value) || 0,
-                bank: Number(document.getElementById("masterSaldoBank").value) || 0
-            };
-            saveToFirebase();
-        }
-
-        function handleSaveSigners(e) {
-            e.preventDefault();
-            appState.signers = {
-                ketua: {
-                    nama: document.getElementById("signerKetuaNama").value,
-                    nip: document.getElementById("signerKetuaNip").value,
-                    jabatan: document.getElementById("signerKetuaJabatan").value
-                },
-                bendahara: {
-                    nama: document.getElementById("signerBendaharaNama").value,
-                    nip: document.getElementById("signerBendaharaNip").value,
-                    jabatan: document.getElementById("signerBendaharaJabatan").value
+        async function deleteTransaction(id) {
+            showConfirmModal(
+                'Hapus Transaksi',
+                'Apakah Anda yakin ingin menghapus transaksi ini?',
+                async function() {
+                    if (isFirebaseActive && db) {
+                        try {
+                            await db.collection("transactions").doc(id).delete();
+                            showToast('Transaksi dihapus dari Firestore');
+                        } catch(e) {
+                            showToast('Gagal hapus di Cloud: ' + e.message, true);
+                        }
+                    } else {
+                        appData.transactions = appData.transactions.filter(t => t.id !== id);
+                        saveToLocalStorage();
+                        renderAll();
+                        showToast('Transaksi dihapus secara lokal');
+                    }
                 }
+            );
+        }
+
+        function viewProof(url) {
+            const w = window.open("");
+            w.document.write(`<img src="${url}" style="max-width:100%; border-radius:8px;" />`);
+        }
+
+        function switchCategoryTab(type) {
+            activeCatTab = type;
+            document.getElementById('catTabPenerimaan').className = type === 'penerimaan' ? "px-3 py-1.5 text-xs font-semibold border-b-2 border-pmi-600 text-pmi-600 transition" : "px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition";
+            document.getElementById('catTabPengeluaran').className = type === 'pengeluaran' ? "px-3 py-1.5 text-xs font-semibold border-b-2 border-pmi-600 text-pmi-600 transition" : "px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 border-b-2 border-transparent transition";
+            renderCategoryList();
+        }
+
+        function renderCategoryList() {
+            const container = document.getElementById('categoryListContainer');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const categories = appData.categories[activeCatTab] || [];
+            if (categories.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic py-2">Belum ada kategori.</p>`;
+                return;
+            }
+
+            categories.forEach((cat) => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between bg-slate-50 hover:bg-slate-100 p-2 px-3 rounded-lg border border-slate-200 text-xs transition">
+                        <span class="font-medium text-slate-700 truncate mr-2">${cat}</span>
+                        <div class="flex items-center space-x-1.5 flex-shrink-0">
+                            <button onclick="openModalEditCategory('${activeCatTab}', '${cat.replace(/'/g, "\\'")}')" class="text-blue-600 hover:text-blue-800 p-1 transition" title="Edit Kategori"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="confirmDeleteCategory('${activeCatTab}', '${cat.replace(/'/g, "\\'")}')" class="text-rose-500 hover:text-rose-700 p-1 transition" title="Hapus Kategori"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addNewCategory() {
+            const input = document.getElementById('newCategoryInput');
+            const val = input.value.trim();
+            if (!val) { showToast('Nama kategori tidak boleh kosong', true); return; }
+
+            if (!appData.categories[activeCatTab]) appData.categories[activeCatTab] = [];
+            if (appData.categories[activeCatTab].includes(val)) { showToast('Kategori ini sudah ada', true); return; }
+
+            appData.categories[activeCatTab].push(val);
+            saveSettingsToCloudOrLocal();
+            input.value = '';
+            renderCategoryList();
+            updateCategoryOptions();
+            showToast('Kategori baru ditambahkan');
+        }
+
+        function openModalEditCategory(type, categoryName) {
+            document.getElementById('editCatType').value = type;
+            document.getElementById('editCatOldName').value = categoryName;
+            document.getElementById('editCatInput').value = categoryName;
+            document.getElementById('modalEditCategory').classList.remove('hidden');
+        }
+
+        function closeModalEditCategory() {
+            document.getElementById('modalEditCategory').classList.add('hidden');
+        }
+
+        function saveEditedCategory() {
+            const type = document.getElementById('editCatType').value;
+            const oldName = document.getElementById('editCatOldName').value;
+            const newName = document.getElementById('editCatInput').value.trim();
+
+            if (!newName) { showToast('Nama kategori tidak boleh kosong', true); return; }
+            if (newName === oldName) { closeModalEditCategory(); return; }
+
+            const idx = appData.categories[type].indexOf(oldName);
+            if (idx !== -1) appData.categories[type][idx] = newName;
+
+            appData.transactions.forEach(t => {
+                if (t.type === type && t.category === oldName) t.category = newName;
+            });
+
+            saveSettingsToCloudOrLocal();
+            closeModalEditCategory();
+            renderAll();
+            showToast('Kategori diperbarui');
+        }
+
+        function confirmDeleteCategory(type, categoryName) {
+            showConfirmModal('Hapus Kategori', `Hapus kategori "${categoryName}"?`, function() {
+                appData.categories[type] = appData.categories[type].filter(c => c !== categoryName);
+                saveSettingsToCloudOrLocal();
+                renderCategoryList();
+                updateCategoryOptions();
+                showToast('Kategori dihapus');
+            });
+        }
+
+        function saveSettingsToCloudOrLocal() {
+            saveToLocalStorage();
+            if (isFirebaseActive && db) {
+                db.collection("settings").doc("app_settings").set({
+                    settings: appData.settings,
+                    categories: appData.categories
+                }, { merge: true });
+            }
+        }
+
+        function showConfirmModal(title, msg, onConfirm) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = msg;
+            confirmCallback = onConfirm;
+
+            const btn = document.getElementById('confirmOkBtn');
+            btn.onclick = function() {
+                if (confirmCallback) confirmCallback();
+                closeConfirmModal();
             };
-            saveToFirebase();
+            document.getElementById('modalConfirm').classList.remove('hidden');
         }
 
-        function renderCategoriesMaster() {
-            const listIn = document.getElementById("listCatPenerimaan");
-            const listOut = document.getElementById("listCatPengeluaran");
-
-            document.getElementById("countCatPenerimaan").textContent = appState.categories.penerimaan.length;
-            document.getElementById("countCatPengeluaran").textContent = appState.categories.pengeluaran.length;
-
-            listIn.innerHTML = appState.categories.penerimaan.map((c, i) => `
-                <li class="p-2 px-3 flex justify-between items-center hover:bg-slate-50">
-                    <span>${c}</span>
-                    <button onclick="removeCategory('penerimaan', ${i})" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-xmark"></i></button>
-                </li>
-            `).join("");
-
-            listOut.innerHTML = appState.categories.pengeluaran.map((c, i) => `
-                <li class="p-2 px-3 flex justify-between items-center hover:bg-slate-50">
-                    <span>${c}</span>
-                    <button onclick="removeCategory('pengeluaran', ${i})" class="text-rose-600 hover:text-rose-800"><i class="fa-solid fa-xmark"></i></button>
-                </li>
-            `).join("");
+        function closeConfirmModal() {
+            document.getElementById('modalConfirm').classList.add('hidden');
+            confirmCallback = null;
         }
 
-        function handleAddCategory(e, type) {
-            e.preventDefault();
-            const inputId = type === 'penerimaan' ? 'newCatPenerimaan' : 'newCatPengeluaran';
-            const val = document.getElementById(inputId).value.trim();
+        function populateSettingsForm() {
+            const cfg = getFirebaseConfig();
+            document.getElementById('fbApiKey').value = cfg.apiKey || '';
+            document.getElementById('fbAuthDomain').value = cfg.authDomain || '';
+            document.getElementById('fbProjectId').value = cfg.projectId || '';
+            document.getElementById('fbStorageBucket').value = cfg.storageBucket || '';
+            document.getElementById('fbSenderId').value = cfg.messagingSenderId || '';
+            document.getElementById('fbAppId').value = cfg.appId || '';
 
-            if (val && !appState.categories[type].includes(val)) {
-                appState.categories[type].push(val);
-                document.getElementById(inputId).value = "";
-                saveToFirebase();
-            }
+            document.getElementById('cfgSekcamName').value = appData.settings.sekcamName || '';
+            document.getElementById('cfgSekcamNip').value = appData.settings.sekcamNip || '';
+            document.getElementById('cfgBendaharaName').value = appData.settings.bendaharaName || '';
+            document.getElementById('cfgSaldoAwalKas').value = appData.settings.saldoAwalKas || 0;
+            document.getElementById('cfgSaldoAwalBank').value = appData.settings.saldoAwalBank || 0;
+            renderCategoryList();
         }
 
-        function removeCategory(type, index) {
-            if (confirm("Hapus kategori ini?")) {
-                appState.categories[type].splice(index, 1);
-                saveToFirebase();
-            }
+        function saveSettings() {
+            appData.settings.sekcamName = document.getElementById('cfgSekcamName').value;
+            appData.settings.sekcamNip = document.getElementById('cfgSekcamNip').value;
+            appData.settings.bendaharaName = document.getElementById('cfgBendaharaName').value;
+            saveSettingsToCloudOrLocal();
+            renderAll();
+            showToast('Identitas penandatangan diperbarui');
         }
 
-        // --- 7. BACKUP, RESTORE & DATA EXPORT ---
-        function exportDatabaseJSON() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", `backup_keuangan_pmi_sumowono_${new Date().toISOString().slice(0, 10)}.json`);
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
+        function saveSaldoAwal() {
+            appData.settings.saldoAwalKas = parseFloat(document.getElementById('cfgSaldoAwalKas').value) || 0;
+            appData.settings.saldoAwalBank = parseFloat(document.getElementById('cfgSaldoAwalBank').value) || 0;
+            saveSettingsToCloudOrLocal();
+            renderAll();
+            showToast('Saldo awal berhasil diupdate');
         }
 
-        function importDatabaseJSON(e) {
-            const file = e.target.files[0];
+        function exportToCSV() {
+            let csv = "ID,Tanggal,Jenis,Kategori,Sumber/Penerima,Metode,Deskripsi,Nominal\n";
+            appData.transactions.forEach(t => {
+                csv += `"${t.id}","${t.date}","${t.type}","${t.category}","${t.party}","${t.method}","${t.description.replace(/"/g, '""')}",${t.amount}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `BKU_PMI_Sumowono_Cloud_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `Backup_Keuangan_PMI_Sumowono_${new Date().toISOString().split('T')[0]}.json`);
+            dlAnchorElem.click();
+        }
+
+        function importDataJSON(event) {
+            const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(evt) {
+            reader.onload = function(e) {
                 try {
-                    const importedData = JSON.parse(evt.target.result);
-                    if (importedData && importedData.categories && importedData.transactions) {
-                        appState = importedData;
-                        saveToFirebase();
-                        alert("Database Firebase berhasil dipulihkan dari berkas JSON!");
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.transactions && imported.settings) {
+                        appData = imported;
+                        saveSettingsToCloudOrLocal();
+                        renderAll();
+                        showToast('Data dipulihkan!');
                     } else {
-                        alert("Format berkas JSON tidak valid!");
+                        showToast('Format JSON tidak valid', true);
                     }
-                } catch (err) {
-                    alert("Gagal membaca file JSON: " + err.message);
+                } catch(err) {
+                    showToast('Gagal membaca file', true);
                 }
             };
             reader.readAsText(file);
         }
 
-        function resetFirebaseDatabase() {
-            if (confirm("PERINGATAN! Anda akan menghapus SELURUH DATA transaksi dari Firebase. Lanjutkan?")) {
-                appState = {
-                    initialBalance: { kas: 0, bank: 0 },
-                    signers: appState.signers,
-                    categories: appState.categories,
-                    transactions: []
-                };
-                saveToFirebase();
-            }
-        }
-
-        function exportToCSV() {
-            if (!appState.transactions.length) {
-                alert("Tidak ada data transaksi untuk diekspor!");
-                return;
-            }
-
-            let csvContent = "data:text/csv;charset=utf-8,ID,Tanggal,Jenis,Metode,Pihak/Vendor,Kategori,Nominal,Keterangan\n";
-            appState.transactions.forEach(t => {
-                const row = `"${t.id}","${t.date}","${t.type}","${t.method}","${t.party}","${t.category}","${t.amount}","${t.description.replace(/"/g, '""')}"`;
-                csvContent += row + "\n";
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `BKU_PMI_Sumowono_${new Date().toISOString().slice(0, 10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
+        function confirmClearAllData() {
+            showConfirmModal(
+                'Reset Semua Data',
+                'PERINGATAN: Menghapus SELURUH transaksi? Tindakan tidak dapat dibatalkan.',
+                async function() {
+                    if (isFirebaseActive && db) {
+                        const batch = db.batch();
+                        appData.transactions.forEach(t => {
+                            batch.delete(db.collection("transactions").doc(t.id));
+                        });
+                        await batch.commit();
+                    }
+                    appData.transactions = [];
+                    saveToLocalStorage();
+                    renderAll();
+                    showToast('Seluruh data transaksi telah dikosongkan.');
+                }
+            );
         }
 
         function loadSampleData() {
-            if (confirm("Muat data demonstrasi ke Firebase?")) {
-                const today = new Date().toISOString().slice(0, 10);
-                appState.initialBalance = { kas: 2500000, bank: 15000000 };
-                appState.transactions = [
-                    { id: 'tx_demo_1', type: 'penerimaan', date: today, party: 'Kecamatan Sumowono', category: 'Hibah Pemerintah', method: 'bank', amount: 10000000, description: 'Penerimaan Dana Hibah Operasional PMI' },
-                    { id: 'tx_demo_2', type: 'pengeluaran', date: today, party: 'Toko ATK Berkah', category: 'Operasional Sekretariat', method: 'kas', amount: 350000, description: 'Pembelian Kertas HVS & Tinta Printer' },
-                    { id: 'tx_demo_3', type: 'pengeluaran', date: today, party: 'Warung Makan Bu Asih', category: 'Kegiatan Donor Darah', method: 'kas', amount: 750000, description: 'Konsumsi Pelaksanaan Donor Darah Kecamatan' }
-                ];
-                saveToFirebase();
-            }
+            seedInitialSampleData();
+            if (isFirebaseActive && db) syncLocalToFirebase();
+            renderAll();
+            showToast('Data demo PMI Sumowono dimuat');
         }
 
-        // --- 8. PRINT & REPORT GENERATION ---
-        function generateReportView() {
-            const reportType = document.getElementById("reportType").value;
-            const period = document.getElementById("reportPeriod").value;
-            const location = document.getElementById("reportLocation").value || "Sumowono";
-
-            const printDocTitle = document.getElementById("printDocTitle");
-            const printDocSubtitle = document.getElementById("printDocSubtitle");
-            const printContainer = document.getElementById("printTableContainer");
-
-            const s = appState.signers;
-            document.getElementById("printNameKetua").textContent = s.ketua?.nama || "-";
-            document.getElementById("printNipKetua").textContent = "NIP/NBM. " + (s.ketua?.nip || "-");
-            document.getElementById("printTitleKetua").textContent = s.ketua?.jabatan || "Ketua PMI Kecamatan";
-
-            document.getElementById("printNameBendahara").textContent = s.bendahara?.nama || "-";
-            document.getElementById("printNipBendahara").textContent = "NIP/NBM. " + (s.bendahara?.nip || "-");
-            document.getElementById("printTitleBendahara").textContent = s.bendahara?.jabatan || "Bendahara PMI Kecamatan";
-
-            const formattedDateStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-            document.getElementById("printSignCityDate").textContent = `${location}, ${formattedDateStr}`;
-            document.getElementById("printGeneratedDate").textContent = `Tanggal Cetak: ${formattedDateStr}`;
-
-            const summary = calculateSummaries();
-            document.getElementById("printKasTunai").textContent = formatRp(summary.saldoTunai);
-            document.getElementById("printKasBank").textContent = formatRp(summary.saldoBank);
-            document.getElementById("printTotalKas").textContent = formatRp(summary.totalSaldo);
-
-            let filteredTx = [...appState.transactions].sort((a, b) => new Date(a.date) - new Date(b.date));
-            if (period) {
-                filteredTx = filteredTx.filter(t => t.date && t.date.startsWith(period));
-                printDocSubtitle.textContent = `Periode: ${period}`;
-            } else {
-                printDocSubtitle.textContent = `Periode: Semua Transaksi Recorded`;
-            }
-
-            if (reportType === 'bku') {
-                printDocTitle.textContent = "LAPORAN BUKU KAS UMUM (BKU)";
-                let runningSaldo = (appState.initialBalance.kas || 0) + (appState.initialBalance.bank || 0);
-                let totalD = 0;
-                let totalK = 0;
-
-                let rows = filteredTx.map((t, idx) => {
-                    const amt = Number(t.amount) || 0;
-                    let debet = 0, kredit = 0;
-                    if (t.type === 'penerimaan') { debet = amt; runningSaldo += amt; totalD += amt; }
-                    else { kredit = amt; runningSaldo -= amt; totalK += amt; }
-
-                    return `
-                        <tr class="border-b border-slate-200">
-                            <td class="p-2 text-center font-mono">${idx + 1}</td>
-                            <td class="p-2 font-mono whitespace-nowrap">${t.date}</td>
-                            <td class="p-2">
-                                <div class="font-bold">${t.party}</div>
-                                <div class="text-[11px] text-slate-600">${t.description}</div>
-                            </td>
-                            <td class="p-2 uppercase font-semibold text-center">${t.method}</td>
-                            <td class="p-2 text-right font-mono">${debet > 0 ? formatRp(debet) : '-'}</td>
-                            <td class="p-2 text-right font-mono">${kredit > 0 ? formatRp(kredit) : '-'}</td>
-                            <td class="p-2 text-right font-mono font-bold">${formatRp(runningSaldo)}</td>
-                        </tr>
-                    `;
-                }).join("");
-
-                printContainer.innerHTML = `
-                    <table class="w-full text-left text-xs border-collapse">
-                        <thead>
-                            <tr class="border-b-2 border-slate-900 bg-slate-100 font-bold uppercase">
-                                <th class="p-2 text-center w-8">No</th>
-                                <th class="p-2">Tanggal</th>
-                                <th class="p-2">Uraian / Transaksi</th>
-                                <th class="p-2 text-center">Metode</th>
-                                <th class="p-2 text-right">Debet (Rp)</th>
-                                <th class="p-2 text-right">Kredit (Rp)</th>
-                                <th class="p-2 text-right">Saldo (Rp)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b border-slate-300 font-semibold bg-slate-50">
-                                <td class="p-2 text-center">-</td>
-                                <td class="p-2">-</td>
-                                <td class="p-2 uppercase font-bold" colspan="2">SALDO AWAL KEUANGAN</td>
-                                <td class="p-2 text-right">-</td>
-                                <td class="p-2 text-right">-</td>
-                                <td class="p-2 text-right font-bold">${formatRp((appState.initialBalance.kas || 0) + (appState.initialBalance.bank || 0))}</td>
-                            </tr>
-                            ${rows}
-                        </tbody>
-                        <tfoot>
-                            <tr class="border-t-2 border-slate-900 font-bold bg-slate-100">
-                                <td colspan="4" class="p-2 text-right uppercase">Total Mutasi & Saldo Akhir:</td>
-                                <td class="p-2 text-right font-mono text-emerald-800">${formatRp(totalD)}</td>
-                                <td class="p-2 text-right font-mono text-rose-800">${formatRp(totalK)}</td>
-                                <td class="p-2 text-right font-mono font-extrabold text-blue-900">${formatRp(runningSaldo)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                `;
-            } else {
-                printDocTitle.textContent = "REKAPITULASI PENERIMAAN & PENGELUARAN PER KATEGORI";
-
-                const inCat = {};
-                const outCat = {};
-
-                filteredTx.forEach(t => {
-                    const amt = Number(t.amount) || 0;
-                    if (t.type === 'penerimaan') inCat[t.category] = (inCat[t.category] || 0) + amt;
-                    else outCat[t.category] = (outCat[t.category] || 0) + amt;
-                });
-
-                const inRows = Object.keys(inCat).map((cat, i) => `
-                    <tr class="border-b border-slate-200">
-                        <td class="p-2 text-center">${i + 1}</td>
-                        <td class="p-2 font-semibold">${cat}</td>
-                        <td class="p-2 text-right font-mono font-bold text-emerald-700">${formatRp(inCat[cat])}</td>
-                    </tr>
-                `).join("");
-
-                const outRows = Object.keys(outCat).map((cat, i) => `
-                    <tr class="border-b border-slate-200">
-                        <td class="p-2 text-center">${i + 1}</td>
-                        <td class="p-2 font-semibold">${cat}</td>
-                        <td class="p-2 text-right font-mono font-bold text-rose-700">${formatRp(outCat[cat])}</td>
-                    </tr>
-                `).join("");
-
-                printContainer.innerHTML = `
-                    <div class="space-y-6 text-xs">
-                        <div>
-                            <h5 class="font-bold text-slate-900 border-b-2 border-slate-900 pb-1 uppercase mb-2">A. Rekapitulasi Penerimaan Kas</h5>
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-100 font-bold uppercase border-b border-slate-300">
-                                        <th class="p-2 text-center w-8">No</th>
-                                        <th class="p-2">Kategori Penerimaan</th>
-                                        <th class="p-2 text-right">Total Nominal (Rp)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${inRows || `<tr><td colspan="3" class="p-2 italic text-center text-slate-400">Tidak ada penerimaan</td></tr>`}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div>
-                            <h5 class="font-bold text-slate-900 border-b-2 border-slate-900 pb-1 uppercase mb-2">B. Rekapitulasi Pengeluaran Kas (SPJ)</h5>
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-100 font-bold uppercase border-b border-slate-300">
-                                        <th class="p-2 text-center w-8">No</th>
-                                        <th class="p-2">Kategori Pengeluaran</th>
-                                        <th class="p-2 text-right">Total Nominal (Rp)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${outRows || `<tr><td colspan="3" class="p-2 italic text-center text-slate-400">Tidak ada pengeluaran</td></tr>`}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-            }
-        }
+        // App Initialization
+        window.addEventListener('DOMContentLoaded', function() {
+            loadFromLocalStorage();
+            initFirebase();
+            renderAll();
+        });
     </script>
 </body>
 </html>
