@@ -486,7 +486,7 @@
                         <div class="text-center flex-1 px-4">
                             <h2 class="font-extrabold text-lg sm:text-xl uppercase tracking-wider text-slate-900">PALANG MERAH INDONESIA (PMI)</h2>
                             <h3 class="font-bold text-base sm:text-lg uppercase text-pmi-700">KECAMATAN SUMOWONO KABUPATEN SEMARANG</h3>
-                            <p class="text-xs text-slate-600 mt-1">Sekretariat: Jl. Raya Sumowono - Kaloran No. 1, Kec. Sumowono, Kab. Semarang 50662</p>
+                            <p class="text-xs text-slate-600 mt-1">Sekretariat: Jl. Jenderal Sudirman No 12 Sumowono, Kabupaten Semarang, Jawa Tengah 50662</p>
                         </div>
                         <div class="w-16 h-16 border-2 border-slate-300 rounded flex items-center justify-center text-[10px] text-slate-400 font-semibold text-center leading-tight">
                             PMI<br>SUMOWONO
@@ -1420,9 +1420,29 @@
             const dateFormatted = `${now.getDate()} ${['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'][now.getMonth()]} ${now.getFullYear()}`;
             document.getElementById('printDateLoc').textContent = `${location}, ${dateFormatted}`;
 
-            document.getElementById('printKasTunai').textContent = formatRupiah(fin.saldoKas);
-            document.getElementById('printKasBank').textContent = formatRupiah(fin.saldoBank);
-            document.getElementById('printTotalKas').textContent = formatRupiah(fin.totalSaldo);
+            // Saldo awal periode (saldo awal pengaturan + semua transaksi sebelum periode)
+            const allSorted = [...appData.transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+            let openKas = parseFloat(appData.settings.saldoAwalKas) || 0;
+            let openBank = parseFloat(appData.settings.saldoAwalBank) || 0;
+            let endKas = openKas, endBank = openBank;
+            allSorted.forEach(t => {
+                const a = parseFloat(t.amount) || 0;
+                const sign = t.type === 'penerimaan' ? 1 : -1;
+                const beforePeriod = period && t.date && t.date.substring(0, 7) < period;
+                const afterPeriod = period && t.date && t.date.substring(0, 7) > period;
+                if (beforePeriod) {
+                    if (t.method === 'kas') openKas += sign * a;
+                    if (t.method === 'bank') openBank += sign * a;
+                }
+                if (!afterPeriod) {
+                    if (t.method === 'kas') endKas += sign * a;
+                    if (t.method === 'bank') endBank += sign * a;
+                }
+            });
+
+            document.getElementById('printKasTunai').textContent = formatRupiah(endKas);
+            document.getElementById('printKasBank').textContent = formatRupiah(endBank);
+            document.getElementById('printTotalKas').textContent = formatRupiah(endKas + endBank);
 
             let filterTitle = 'Semua Transaksi';
             let txs = [...appData.transactions].sort((a,b) => new Date(a.date) - new Date(b.date));
@@ -1438,37 +1458,62 @@
                 document.getElementById('printDocTitle').textContent = 'LAPORAN BUKU KAS UMUM (BKU)';
                 document.getElementById('printDocSubtitle').textContent = `Periode: ${filterTitle}`;
 
+                const bc = 'border border-slate-300';
                 let html = `
-                    <table class="w-full text-xs text-left border-collapse border border-slate-300">
+                    <table class="w-full text-[10px] text-left border-collapse border border-slate-300">
                         <thead>
-                            <tr class="bg-slate-100 text-slate-800 font-bold border-b border-slate-300 text-center uppercase">
-                                <th class="border border-slate-300 p-2 w-8">No</th>
-                                <th class="border border-slate-300 p-2 w-24">Tanggal</th>
-                                <th class="border border-slate-300 p-2">Uraian / Keterangan Transaksi</th>
-                                <th class="border border-slate-300 p-2 w-28 text-right">Penerimaan (D)</th>
-                                <th class="border border-slate-300 p-2 w-28 text-right">Pengeluaran (K)</th>
+                            <tr class="bg-slate-100 text-slate-800 font-bold text-center uppercase">
+                                <th rowspan="2" class="${bc} p-1.5 w-7">No</th>
+                                <th rowspan="2" class="${bc} p-1.5 w-20">Tanggal</th>
+                                <th rowspan="2" class="${bc} p-1.5">Uraian / Keterangan Transaksi</th>
+                                <th rowspan="2" class="${bc} p-1.5 w-12">Kas</th>
+                                <th colspan="2" class="${bc} p-1.5">Pergerakan Kas</th>
+                                <th rowspan="2" class="${bc} p-1.5 w-24 text-right">Saldo</th>
+                            </tr>
+                            <tr class="bg-slate-100 text-slate-800 font-bold text-center uppercase">
+                                <th class="${bc} p-1.5 w-24 text-right">Penerimaan (D)</th>
+                                <th class="${bc} p-1.5 w-24 text-right">Pengeluaran (K)</th>
                             </tr>
                         </thead>
                         <tbody>
                 `;
 
+                let runKas = openKas, runBank = openBank;
                 let totD = 0, totK = 0;
+
+                html += `
+                    <tr class="bg-slate-50 font-bold">
+                        <td class="${bc} p-1.5 text-center">-</td>
+                        <td class="${bc} p-1.5">-</td>
+                        <td class="${bc} p-1.5 uppercase">Saldo Awal ${period ? 'Periode' : ''} (Tunai ${formatRupiah(openKas)} + Bank ${formatRupiah(openBank)})</td>
+                        <td class="${bc} p-1.5 text-center">-</td>
+                        <td class="${bc} p-1.5 text-right">-</td>
+                        <td class="${bc} p-1.5 text-right">-</td>
+                        <td class="${bc} p-1.5 text-right">${formatRupiah(runKas + runBank)}</td>
+                    </tr>
+                `;
+
                 if (txs.length === 0) {
-                    html += `<tr><td colspan="5" class="p-4 text-center italic text-slate-400">Tidak ada data transaksi pada periode ini.</td></tr>`;
+                    html += `<tr><td colspan="7" class="${bc} p-4 text-center italic text-slate-400">Tidak ada transaksi pada periode ini.</td></tr>`;
                 } else {
                     txs.forEach((tx, i) => {
                         const amt = parseFloat(tx.amount) || 0;
-                        let deb = tx.type === 'penerimaan' ? amt : 0;
-                        let kre = tx.type === 'pengeluaran' ? amt : 0;
+                        const deb = tx.type === 'penerimaan' ? amt : 0;
+                        const kre = tx.type === 'pengeluaran' ? amt : 0;
                         totD += deb; totK += kre;
+                        const delta = deb - kre;
+                        if (tx.method === 'kas') runKas += delta;
+                        if (tx.method === 'bank') runBank += delta;
 
                         html += `
-                            <tr class="border-b border-slate-200">
-                                <td class="border border-slate-300 p-2 text-center">${i+1}</td>
-                                <td class="border border-slate-300 p-2">${formatDate(tx.date)}</td>
-                                <td class="border border-slate-300 p-2"><span class="font-bold">${tx.category}</span>: ${tx.description} (${tx.party})</td>
-                                <td class="border border-slate-300 p-2 text-right">${deb > 0 ? formatRupiah(deb) : '-'}</td>
-                                <td class="border border-slate-300 p-2 text-right">${kre > 0 ? formatRupiah(kre) : '-'}</td>
+                            <tr>
+                                <td class="${bc} p-1.5 text-center">${i+1}</td>
+                                <td class="${bc} p-1.5">${formatDate(tx.date)}</td>
+                                <td class="${bc} p-1.5"><span class="font-bold">${tx.category}</span>: ${tx.description} (${tx.party})</td>
+                                <td class="${bc} p-1.5 text-center uppercase">${tx.method === 'bank' ? 'Bank' : 'Tunai'}</td>
+                                <td class="${bc} p-1.5 text-right">${deb > 0 ? formatRupiah(deb) : '-'}</td>
+                                <td class="${bc} p-1.5 text-right">${kre > 0 ? formatRupiah(kre) : '-'}</td>
+                                <td class="${bc} p-1.5 text-right font-semibold">${formatRupiah(runKas + runBank)}</td>
                             </tr>
                         `;
                     });
@@ -1477,10 +1522,15 @@
                 html += `
                         </tbody>
                         <tfoot>
-                            <tr class="bg-slate-100 font-bold border-t-2 border-slate-400">
-                                <td colspan="3" class="border border-slate-300 p-2 text-right uppercase">Jumlah Total:</td>
-                                <td class="border border-slate-300 p-2 text-right text-emerald-800">${formatRupiah(totD)}</td>
-                                <td class="border border-slate-300 p-2 text-right text-rose-800">${formatRupiah(totK)}</td>
+                            <tr class="bg-slate-100 font-bold">
+                                <td colspan="4" class="${bc} p-1.5 text-right uppercase">Jumlah Mutasi:</td>
+                                <td class="${bc} p-1.5 text-right text-emerald-800">${formatRupiah(totD)}</td>
+                                <td class="${bc} p-1.5 text-right text-rose-800">${formatRupiah(totK)}</td>
+                                <td class="${bc} p-1.5"></td>
+                            </tr>
+                            <tr class="bg-slate-200 font-extrabold">
+                                <td colspan="6" class="${bc} p-1.5 text-right uppercase">Saldo Akhir (Tunai ${formatRupiah(runKas)} + Bank ${formatRupiah(runBank)}):</td>
+                                <td class="${bc} p-1.5 text-right">${formatRupiah(runKas + runBank)}</td>
                             </tr>
                         </tfoot>
                     </table>
